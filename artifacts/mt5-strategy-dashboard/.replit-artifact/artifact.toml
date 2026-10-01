@@ -1,0 +1,28 @@
+kind = "data-app"
+previewPath = "/"
+title = "MT5 Strategy Dashboard"
+description = "A dark, real-time-feeling dashboard for MetaTrader 5 strategy performance, grouping trade history by magic number and showing risk and return metrics with equity charts. Includes a webhook API for Expert Advisor trade-history payloads."
+version = "1.0.0"
+id = "artifacts/mt5-strategy-dashboard"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22677
+
+[services.development]
+run = "pnpm --filter @workspace/mt5-strategy-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mt5-strategy-dashboard", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mt5-strategy-dashboard/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22677"
+BASE_PATH = "/"
