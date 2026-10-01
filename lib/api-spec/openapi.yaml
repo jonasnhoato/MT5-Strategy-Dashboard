@@ -201,6 +201,11 @@ components:
       properties:
         magicNumber:
           type: integer
+        symbols:
+          type: array
+          description: Distinct traded symbols for this magic number.
+          items:
+            type: string
         netProfit:
           type: number
         profitFactor:
@@ -225,7 +230,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EquityPoint"
-      required: [magicNumber, netProfit, profitFactor, winRate, maxDrawdown, sharpeRatio, payoutRatio, tradeCount, wins, losses, breakeven, equity]
+      required: [magicNumber, symbols, netProfit, profitFactor, winRate, maxDrawdown, sharpeRatio, payoutRatio, tradeCount, wins, losses, breakeven, equity]
     TradeDashboard:
       type: object
       properties:

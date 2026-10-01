@@ -92,6 +92,7 @@ export const GetTradesDashboardResponse = zod.object({
 }),
   "strategies": zod.array(zod.object({
   "magicNumber": zod.number().int(),
+  "symbols": zod.array(zod.string()).describe('Distinct traded symbols for this magic number.'),
   "netProfit": zod.number(),
   "profitFactor": zod.number().nullable(),
   "winRate": zod.number(),

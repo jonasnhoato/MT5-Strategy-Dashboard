@@ -80,6 +80,8 @@ export interface EquityPoint {
 
 export interface StrategyPerformance {
   magicNumber: number;
+  /** Distinct traded symbols for this magic number. */
+  symbols: string[];
   netProfit: number;
   /** @nullable */
   profitFactor: number | null;

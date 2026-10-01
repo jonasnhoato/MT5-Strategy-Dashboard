@@ -132,6 +132,7 @@ function EquityChart({ strategy, light }: { strategy: StrategyPerformance; light
 
 function StrategyPanel({ strategy, light }: { strategy: StrategyPerformance; light: boolean }) {
   const positive = strategy.netProfit >= 0;
+  const symbols = strategy.symbols ?? [];
   const stat = [
     ['Profit factor', pfLabel(strategy.profitFactor, strategy)],
     ['Win rate', percent(strategy.winRate)],
@@ -146,8 +147,20 @@ function StrategyPanel({ strategy, light }: { strategy: StrategyPerformance; lig
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary"><Activity size={17}/></div>
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-display font-semibold tracking-[-.03em] text-[17px]">Magic number <span className="mono text-primary">{strategy.magicNumber}</span></h2>
+            {symbols.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5" aria-label={`Assets traded by magic number ${strategy.magicNumber}`}>
+                <span className="mr-0.5 text-[9px] font-semibold uppercase tracking-[.14em] text-muted-foreground">Assets</span>
+                {symbols.map((symbol) => (
+                  <span key={symbol} title={`Traded asset: ${symbol}`} className="inline-flex items-center rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-bold tracking-wide text-primary">
+                    {symbol}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">No ticker data</span>
+            )}
             <span className="rounded-full border border-border bg-muted/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{strategy.tradeCount} trades</span>
           </div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">Expert Advisor performance · {strategy.breakeven} breakeven</p>

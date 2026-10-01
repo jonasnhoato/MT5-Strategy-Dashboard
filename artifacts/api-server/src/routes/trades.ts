@@ -68,6 +68,7 @@ router.get("/trades/dashboard", async (_req, res): Promise<void> => {
     .select({
       id: mt5TradesTable.id,
       magicNumber: mt5TradesTable.magicNumber,
+      symbol: mt5TradesTable.symbol,
       closeTime: mt5TradesTable.closeTime,
       netProfit: mt5TradesTable.netProfit,
     })
@@ -85,10 +86,19 @@ router.get("/trades/dashboard", async (_req, res): Promise<void> => {
   }
 
   const strategies = [...byMagicNumber.entries()]
-    .map(([magicNumber, strategyTrades]) => ({
-      magicNumber,
-      ...calculateTradeMetrics(strategyTrades),
-    }))
+    .map(([magicNumber, strategyTrades]) => {
+      const symbols = [...new Set(
+        strategyTrades
+          .map((trade) => trade.symbol?.trim().toUpperCase())
+          .filter((symbol): symbol is string => Boolean(symbol)),
+      )].sort();
+
+      return {
+        magicNumber,
+        symbols,
+        ...calculateTradeMetrics(strategyTrades),
+      };
+    })
     .sort((a, b) => b.netProfit - a.netProfit || a.magicNumber - b.magicNumber);
   const totals = calculateTradeMetrics(trades);
 
