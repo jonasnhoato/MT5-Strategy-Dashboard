@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { getGetTradesDashboardQueryKey, useGetTradesDashboard } from '@workspace/api-client-react';
+import {
+  getGetTradesDashboardQueryKey, useClearTrades, useGetTradesDashboard,
+} from '@workspace/api-client-react';
 import type { StrategyPerformance } from '@workspace/api-client-react';
 import { CSVLink } from 'react-csv';
 import {
@@ -14,7 +20,7 @@ import {
 import {
   Activity, AlertCircle, ArrowDownRight, ArrowUpRight, BarChart3, Check,
   ChevronDown, CircleHelp, Clock3, Download, ExternalLink, Moon, Printer,
-  RefreshCw, Sun, TrendingUp, WalletCards,
+  RefreshCw, Sun, Trash2, TrendingUp, WalletCards,
 } from 'lucide-react';
 import {
   Route,
@@ -188,6 +194,8 @@ function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearTradeError, setClearTradeError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const query = useGetTradesDashboard({
     query: {
@@ -195,6 +203,20 @@ function Home() {
       staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
       refetchInterval: autoRefresh ? intervalMs : false,
+    },
+  });
+  const clearTradesMutation = useClearTrades({
+    mutation: {
+      onSuccess: async () => {
+        setClearDialogOpen(false);
+        setClearTradeError(null);
+        await queryClient.invalidateQueries({
+          queryKey: getGetTradesDashboardQueryKey(),
+        });
+      },
+      onError: () => {
+        setClearTradeError('Trade history could not be cleared. Please try again.');
+      },
     },
   });
   const data = query.data;
@@ -238,7 +260,7 @@ function Home() {
                 <RefreshCw size={14} className={query.isFetching ? 'animate-spin text-primary' : ''}/> Refresh
               </button>
               <div className="my-2 w-px bg-border"/>
-              <button type="button" onClick={() => setMenuOpen((open) => !open)} className="flex items-center gap-1.5 px-2.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Auto-refresh settings" data-testid="button-auto-refresh-menu">
+              <button type="button" onClick={() => setMenuOpen((open) => !open)} className="flex items-center gap-1.5 px-2.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Dashboard settings" aria-expanded={menuOpen} data-testid="button-dashboard-settings">
                 {autoRefresh ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/> : null}
                 <ChevronDown size={14}/>
               </button>
@@ -257,12 +279,57 @@ function Home() {
                 </button>)}
               </div>
               <div className="mt-2 border-t border-border pt-2 text-[10px] leading-relaxed text-muted-foreground">Automatic checks run no more often than every 5 minutes.</div>
+              <div className="mt-3 border-t border-border pt-3">
+                <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Danger zone</div>
+                <button type="button" onClick={() => {
+                  setClearTradeError(null);
+                  setMenuOpen(false);
+                  setClearDialogOpen(true);
+                }} className="flex w-full items-center gap-2 rounded-md border border-rose-500/25 bg-rose-500/[.07] px-2.5 py-2 text-left text-xs font-medium text-rose-300 transition hover:border-rose-500/45 hover:bg-rose-500/[.12]" aria-label="Clear all trades" data-testid="button-clear-all-trades">
+                  <Trash2 size={14}/> Clear all trades
+                </button>
+                <p className="mt-1.5 px-0.5 text-[10px] leading-relaxed text-muted-foreground">Removes trade history from every account.</p>
+              </div>
             </div>}
           </div>
           <button type="button" onClick={() => window.print()} className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[12px] text-muted-foreground transition hover:text-foreground" aria-label="Export dashboard as PDF" data-testid="button-export-pdf"><Printer size={14}/><span className="hidden sm:inline">PDF</span></button>
           <button type="button" onClick={() => setLight((value) => !value)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:text-foreground" aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'} data-testid="button-toggle-theme">{light ? <Moon size={15}/> : <Sun size={15}/>}</button>
         </div>
       </header>
+      <AlertDialog
+        open={clearDialogOpen}
+        onOpenChange={(open) => {
+          if (!clearTradesMutation.isPending) {
+            setClearDialogOpen(open);
+            if (!open) setClearTradeError(null);
+          }
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-clear-trades">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all trade history?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes trades from every MT5 account and removes all strategy metrics and equity history. Other database tables are not affected. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {clearTradeError && <p role="alert" className="text-sm text-destructive" data-testid="status-clear-trades-error">{clearTradeError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearTradesMutation.isPending} data-testid="button-cancel-clear-trades">Keep trades</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={clearTradesMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                setClearTradeError(null);
+                clearTradesMutation.mutate(undefined);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-clear-trades"
+            >
+              {clearTradesMutation.isPending ? 'Clearing…' : 'Clear all trade history'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="fade-up mb-5 flex flex-wrap items-center justify-between gap-2">
         <div>

@@ -66,6 +66,15 @@ export const IngestTradesResponse = zod.object({
 
 
 /**
+ * Permanently deletes trades from every account. Other database tables are not affected.
+ * @summary Delete all stored MT5 trade history
+ */
+export const ClearTradesResponse = zod.object({
+  "cleared": zod.boolean()
+})
+
+
+/**
  * @summary Get account and per-magic-number trading performance
  */
 export const GetTradesDashboardResponse = zod.object({

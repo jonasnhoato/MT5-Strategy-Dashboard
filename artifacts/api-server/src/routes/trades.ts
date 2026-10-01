@@ -1,6 +1,7 @@
 import { asc } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
+  ClearTradesResponse,
   GetTradesDashboardResponse,
   IngestTradesBody,
   IngestTradesResponse,
@@ -55,6 +56,11 @@ router.post("/trades", async (req, res): Promise<void> => {
     inserted,
     duplicates: received - inserted,
   }));
+});
+
+router.delete("/trades", async (_req, res): Promise<void> => {
+  await db.delete(mt5TradesTable);
+  res.json(ClearTradesResponse.parse({ cleared: true }));
 });
 
 router.get("/trades/dashboard", async (_req, res): Promise<void> => {

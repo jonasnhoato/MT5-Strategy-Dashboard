@@ -52,6 +52,10 @@ export interface TradeIngestResult {
   duplicates: number;
 }
 
+export interface ClearTradesResult {
+  cleared: boolean;
+}
+
 export interface DashboardTotals {
   netProfit: number;
   /** @nullable */

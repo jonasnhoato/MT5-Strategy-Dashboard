@@ -51,6 +51,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: clearTrades
+      tags: [trades]
+      summary: Delete all stored MT5 trade history
+      description: Permanently deletes trades from every account. Other database tables are not affected.
+      responses:
+        "200":
+          description: Trade history cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearTradesResult"
   /trades/dashboard:
     get:
       operationId: getTradesDashboard
@@ -143,6 +155,12 @@ components:
         duplicates:
           type: integer
       required: [received, inserted, duplicates]
+    ClearTradesResult:
+      type: object
+      properties:
+        cleared:
+          type: boolean
+      required: [cleared]
     DashboardTotals:
       type: object
       properties:

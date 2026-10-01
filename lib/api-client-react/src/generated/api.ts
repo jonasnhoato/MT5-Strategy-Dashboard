@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ClearTradesResult,
   ErrorResponse,
   HealthStatus,
   TradeBatchInput,
@@ -219,6 +220,81 @@ export const useIngestTrades = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getIngestTradesMutationOptions(options));
+    }
+
+export const getClearTradesUrl = () => {
+
+
+
+
+  return `/api/trades`
+}
+
+/**
+ * Permanently deletes trades from every account. Other database tables are not affected.
+ * @summary Delete all stored MT5 trade history
+ */
+export const clearTrades = async ( options?: Parameters<typeof customFetch>[1]): Promise<ClearTradesResult> => {
+
+  return customFetch<ClearTradesResult>(getClearTradesUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getClearTradesMutationKey = () => ['clearTrades'] as const;
+
+export const getClearTradesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearTrades>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearTrades>>, TError,void, TContext> => {
+
+const mutationKey = getClearTradesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearTrades>>, void> = () => {
+
+
+          return  clearTrades(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearTradesMutationResult = NonNullable<Awaited<ReturnType<typeof clearTrades>>>
+
+    export type ClearTradesMutationError = ErrorType<unknown>
+
+
+    /**
+ * @summary Delete all stored MT5 trade history
+ */
+export const useClearTrades = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearTrades>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearTrades>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClearTradesMutationOptions(options));
     }
 
 export const getGetTradesDashboardUrl = () => {
