@@ -279,19 +279,15 @@ function Home() {
                 </button>)}
               </div>
               <div className="mt-2 border-t border-border pt-2 text-[10px] leading-relaxed text-muted-foreground">Automatic checks run no more often than every 5 minutes.</div>
-              <div className="mt-3 border-t border-border pt-3">
-                <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Danger zone</div>
-                <button type="button" onClick={() => {
-                  setClearTradeError(null);
-                  setMenuOpen(false);
-                  setClearDialogOpen(true);
-                }} className="flex w-full items-center gap-2 rounded-md border border-rose-500/25 bg-rose-500/[.07] px-2.5 py-2 text-left text-xs font-medium text-rose-300 transition hover:border-rose-500/45 hover:bg-rose-500/[.12]" aria-label="Clear all trades" data-testid="button-clear-all-trades">
-                  <Trash2 size={14}/> Clear all trades
-                </button>
-                <p className="mt-1.5 px-0.5 text-[10px] leading-relaxed text-muted-foreground">Removes trade history from every account.</p>
-              </div>
             </div>}
           </div>
+          <button type="button" onClick={() => {
+            setClearTradeError(null);
+            setMenuOpen(false);
+            setClearDialogOpen(true);
+          }} className="flex h-9 items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/[.07] px-3 text-[12px] font-medium text-rose-300 transition hover:border-rose-500/50 hover:bg-rose-500/[.12]" aria-label="Clear all trades" data-testid="button-clear-all-trades">
+            <Trash2 size={14}/><span>Clear all trades</span>
+          </button>
           <button type="button" onClick={() => window.print()} className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[12px] text-muted-foreground transition hover:text-foreground" aria-label="Export dashboard as PDF" data-testid="button-export-pdf"><Printer size={14}/><span className="hidden sm:inline">PDF</span></button>
           <button type="button" onClick={() => setLight((value) => !value)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:text-foreground" aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'} data-testid="button-toggle-theme">{light ? <Moon size={15}/> : <Sun size={15}/>}</button>
         </div>
