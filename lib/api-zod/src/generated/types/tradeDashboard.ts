@@ -11,6 +11,7 @@ import type { StrategyPerformance } from './strategyPerformance';
 export interface TradeDashboard {
   totals: DashboardTotals;
   strategies: StrategyPerformance[];
+  pausedMagicNumbers: number[];
   /** @nullable */
   latestTradeAt: Date | null;
 }

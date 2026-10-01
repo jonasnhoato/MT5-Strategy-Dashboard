@@ -10,6 +10,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import {
   getGetTradesDashboardQueryKey, useClearTrades, useGetTradesDashboard,
+  usePauseMagicNumber, useResumeMagicNumber,
 } from '@workspace/api-client-react';
 import type { StrategyPerformance } from '@workspace/api-client-react';
 import { CSVLink } from 'react-csv';
@@ -20,7 +21,7 @@ import {
 import {
   Activity, AlertCircle, ArrowDownRight, ArrowUpRight, BarChart3, Check,
   ChevronDown, CircleHelp, Clock3, Download, ExternalLink, Moon, Printer,
-  RefreshCw, Sun, Trash2, TrendingUp, WalletCards,
+  RefreshCw, Sun, Trash2, TrendingUp, WalletCards, X,
 } from 'lucide-react';
 import {
   Route,
@@ -130,7 +131,12 @@ function EquityChart({ strategy, light }: { strategy: StrategyPerformance; light
   </div>;
 }
 
-function StrategyPanel({ strategy, light }: { strategy: StrategyPerformance; light: boolean }) {
+function StrategyPanel({ strategy, light, onPause, pausePending }: {
+  strategy: StrategyPerformance;
+  light: boolean;
+  onPause: (strategy: StrategyPerformance) => void;
+  pausePending: boolean;
+}) {
   const positive = strategy.netProfit >= 0;
   const symbols = strategy.symbols ?? [];
   const stat = [
@@ -166,11 +172,20 @@ function StrategyPanel({ strategy, light }: { strategy: StrategyPerformance; lig
           <p className="mt-0.5 text-[11px] text-muted-foreground">Expert Advisor performance · {strategy.breakeven} breakeven</p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <div className="text-right">
           <div className="metric-label">Net profit</div>
           <div className={`mono mt-0.5 text-[19px] font-medium ${positive ? 'text-emerald-300' : 'text-rose-300'}`}>{money(strategy.netProfit)}</div>
         </div>
+        <button
+          type="button"
+          onClick={() => onPause(strategy)}
+          disabled={pausePending}
+          className="print-hidden inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/[.07] px-2.5 text-xs font-medium text-rose-300 transition hover:border-rose-500/50 hover:bg-rose-500/[.12] disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={`Stop monitoring and delete history for magic number ${strategy.magicNumber}`}
+          title="Stop monitoring and delete this strategy's history"
+          data-testid={`button-delete-strategy-${strategy.magicNumber}`}
+        ><Trash2 size={13}/><span>Delete</span></button>
         {strategy.equity.length > 0 && <CSVLink
           data={strategy.equity}
           headers={equityCsvHeaders}
@@ -209,6 +224,10 @@ function Home() {
   const [copyError, setCopyError] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearTradeError, setClearTradeError] = useState<string | null>(null);
+  const [strategyToPause, setStrategyToPause] = useState<StrategyPerformance | null>(null);
+  const [strategyActionError, setStrategyActionError] = useState<string | null>(null);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [trackingNotice, setTrackingNotice] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const query = useGetTradesDashboard({
     query: {
@@ -232,7 +251,41 @@ function Home() {
       },
     },
   });
+  const pauseMagicNumberMutation = usePauseMagicNumber({
+    mutation: {
+      onSuccess: async (result) => {
+        setStrategyToPause(null);
+        setStrategyActionError(null);
+        setTrackingNotice(
+          `Magic number ${result.magicNumber} paused. Removed ${result.deletedTrades} stored trades. Re-enable it below to accept future uploads.`,
+        );
+        await queryClient.invalidateQueries({
+          queryKey: getGetTradesDashboardQueryKey(),
+        });
+      },
+      onError: () => {
+        setStrategyActionError('This magic number could not be paused. Please try again.');
+      },
+    },
+  });
+  const resumeMagicNumberMutation = useResumeMagicNumber({
+    mutation: {
+      onSuccess: async (result) => {
+        setResumeError(null);
+        setTrackingNotice(
+          `Magic number ${result.magicNumber} is active again. New trades will appear after the next MT5 upload; deleted history is not restored.`,
+        );
+        await queryClient.invalidateQueries({
+          queryKey: getGetTradesDashboardQueryKey(),
+        });
+      },
+      onError: () => {
+        setResumeError('Monitoring could not be resumed. Please try again.');
+      },
+    },
+  });
   const data = query.data;
+  const pausedMagicNumbers = data?.pausedMagicNumbers ?? [];
   const loading = query.isLoading || query.isFetching;
   const hasData = !!data && (data.totals.tradeCount > 0 || data.strategies.length > 0);
   const webhookUrl = `${window.location.origin}/api/trades`;
@@ -294,17 +347,21 @@ function Home() {
               <div className="mt-2 border-t border-border pt-2 text-[10px] leading-relaxed text-muted-foreground">Automatic checks run no more often than every 5 minutes.</div>
             </div>}
           </div>
-          <button type="button" onClick={() => {
+          <button type="button" disabled={pauseMagicNumberMutation.isPending} onClick={() => {
             setClearTradeError(null);
             setMenuOpen(false);
             setClearDialogOpen(true);
-          }} className="flex h-9 items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/[.07] px-3 text-[12px] font-medium text-rose-300 transition hover:border-rose-500/50 hover:bg-rose-500/[.12]" aria-label="Clear all trades" data-testid="button-clear-all-trades">
+          }} className="flex h-9 items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/[.07] px-3 text-[12px] font-medium text-rose-300 transition hover:border-rose-500/50 hover:bg-rose-500/[.12] disabled:cursor-not-allowed disabled:opacity-50" aria-label="Clear all trades" data-testid="button-clear-all-trades">
             <Trash2 size={14}/><span>Clear all trades</span>
           </button>
           <button type="button" onClick={() => window.print()} className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[12px] text-muted-foreground transition hover:text-foreground" aria-label="Export dashboard as PDF" data-testid="button-export-pdf"><Printer size={14}/><span className="hidden sm:inline">PDF</span></button>
           <button type="button" onClick={() => setLight((value) => !value)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:text-foreground" aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'} data-testid="button-toggle-theme">{light ? <Moon size={15}/> : <Sun size={15}/>}</button>
         </div>
       </header>
+      {trackingNotice && <div role="status" className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/[.07] px-3 py-2 text-xs text-foreground" data-testid="status-strategy-tracking">
+        <span>{trackingNotice}</span>
+        <button type="button" onClick={() => setTrackingNotice(null)} className="shrink-0 rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Dismiss strategy status"><X size={14}/></button>
+      </div>}
       <AlertDialog
         open={clearDialogOpen}
         onOpenChange={(open) => {
@@ -335,6 +392,44 @@ function Home() {
               data-testid="button-confirm-clear-trades"
             >
               {clearTradesMutation.isPending ? 'Clearing…' : 'Clear all trade history'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={strategyToPause !== null}
+        onOpenChange={(open) => {
+          if (!pauseMagicNumberMutation.isPending && !open) {
+            setStrategyToPause(null);
+            setStrategyActionError(null);
+          }
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-pause-strategy">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Pause magic number {strategyToPause?.magicNumber} and delete its history?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This deletes all stored trades for magic number {strategyToPause?.magicNumber} across every account, including its metrics and equity history. Future MT5 uploads for this magic number will be ignored until you re-enable it. Deleted history cannot be restored, and other magic numbers are not affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {strategyActionError && <p role="alert" className="text-sm text-destructive" data-testid="status-pause-strategy-error">{strategyActionError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pauseMagicNumberMutation.isPending} data-testid="button-cancel-pause-strategy">Keep monitoring</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={pauseMagicNumberMutation.isPending || strategyToPause === null}
+              onClick={(event) => {
+                event.preventDefault();
+                if (strategyToPause) {
+                  setStrategyActionError(null);
+                  pauseMagicNumberMutation.mutate({ magicNumber: strategyToPause.magicNumber });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-pause-strategy"
+            >
+              {pauseMagicNumberMutation.isPending ? 'Pausing…' : 'Pause and delete history'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -384,6 +479,35 @@ function Home() {
         <div><div className="flex items-center gap-2"><BarChart3 size={15} className="text-primary"/><h2 className="text-[13px] font-semibold tracking-wide">STRATEGY BREAKDOWN</h2></div><p className="mt-1 text-[10px] text-muted-foreground">One performance profile per MT5 magic number.</p></div>
         {hasData && <span className="mono text-[10px] text-muted-foreground">{orderedStrategies.length} {orderedStrategies.length === 1 ? 'strategy' : 'strategies'}</span>}
       </div>
+      {pausedMagicNumbers.length > 0 && <section className="panel mb-4 rounded-xl p-4 sm:p-5" aria-label="Paused strategies" data-testid="panel-paused-strategies">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">Paused strategies</h3>
+            <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-muted-foreground">New MT5 trades for these magic numbers are ignored. Re-enabling starts collecting new trades again; deleted history will not return.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {pausedMagicNumbers.map((magicNumber) => {
+              const isResuming = resumeMagicNumberMutation.isPending
+                && resumeMagicNumberMutation.variables?.magicNumber === magicNumber;
+              return <div key={magicNumber} className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 py-1 pl-2.5 pr-1">
+                <span className="mono text-[11px] font-semibold">Magic #{magicNumber}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResumeError(null);
+                    resumeMagicNumberMutation.mutate({ magicNumber });
+                  }}
+                  disabled={resumeMagicNumberMutation.isPending || pauseMagicNumberMutation.isPending}
+                  className="inline-flex h-7 items-center rounded-md bg-primary/15 px-2 text-[10px] font-semibold text-primary transition hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={`Re-enable monitoring for magic number ${magicNumber}`}
+                  data-testid={`button-resume-strategy-${magicNumber}`}
+                >{isResuming ? 'Re-enabling…' : 'Re-enable'}</button>
+              </div>;
+            })}
+          </div>
+        </div>
+        {resumeError && <p role="alert" className="mt-3 text-xs text-destructive" data-testid="status-resume-strategy-error">{resumeError}</p>}
+      </section>}
       {loading && !data ? <div className="space-y-3" aria-label="Loading dashboard">
         {[0, 1].map((item) => <div key={item} className="panel animate-pulse rounded-2xl p-5">
           <div className="flex justify-between"><div className="h-5 w-44 rounded bg-muted"/><div className="h-6 w-24 rounded bg-muted"/></div>
@@ -392,20 +516,35 @@ function Home() {
         </div>)}
       </div> : null}
       {hasData && orderedStrategies.length > 0 && <div className="space-y-3.5">
-        {orderedStrategies.map((strategy) => <StrategyPanel key={strategy.magicNumber} strategy={strategy} light={light}/>)}
+        {orderedStrategies.map((strategy) => <StrategyPanel
+          key={strategy.magicNumber}
+          strategy={strategy}
+          light={light}
+          onPause={(selected) => {
+            setStrategyActionError(null);
+            setStrategyToPause(selected);
+          }}
+          pausePending={pauseMagicNumberMutation.isPending || clearTradesMutation.isPending || resumeMagicNumberMutation.isPending}
+        />)}
       </div>}
       {!loading && !query.isError && !hasData && <div className="panel fine-grid relative overflow-hidden rounded-2xl p-6 sm:p-9">
         <div className="absolute right-6 top-3 hidden select-none font-display text-[110px] font-extrabold leading-none tracking-[-.08em] text-primary/[.045] sm:block">MT5</div>
         <div className="relative max-w-2xl">
           <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><BarChart3 size={21}/></div>
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[.17em] text-primary">Awaiting first trade history</div>
-          <h3 className="font-display text-[22px] font-bold tracking-[-.05em] sm:text-[27px]">Your strategies will appear here.</h3>
-          <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-muted-foreground">No closed trades have been received yet. Connect your MT5 history ingestion to begin reviewing each Expert Advisor by its magic number. Metrics remain blank until real trade data arrives.</p>
-          <div className="mt-6 grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-border/80 bg-card/75 p-3"><div className="mono text-[10px] text-primary">01 / ALLOW</div><div className="mt-1 text-xs font-medium">Allow the dashboard URL</div><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">In MT5, open Tools → Options → Expert Advisors and add this site to the WebRequest allowlist.</p></div>
-            <div className="rounded-lg border border-border/80 bg-card/75 p-3"><div className="mono text-[10px] text-primary">02 / MAP</div><div className="mt-1 text-xs font-medium">Keep each magic number</div><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">The EA sends closed trades with magic_number, close_time, and profit.</p></div>
-            <div className="rounded-lg border border-border/80 bg-card/75 p-3"><div className="mono text-[10px] text-primary">03 / POST</div><div className="mt-1 text-xs font-medium">Send trade history</div><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">POST JSON with Content-Type: application/json. Repeated tickets are ignored per account.</p></div>
-          </div>
+          {pausedMagicNumbers.length === 0 ? <>
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[.17em] text-primary">Awaiting first trade history</div>
+            <h3 className="font-display text-[22px] font-bold tracking-[-.05em] sm:text-[27px]">Your strategies will appear here.</h3>
+            <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-muted-foreground">No closed trades have been received yet. Connect your MT5 history ingestion to begin reviewing each Expert Advisor by its magic number. Metrics remain blank until real trade data arrives.</p>
+            <div className="mt-6 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg border border-border/80 bg-card/75 p-3"><div className="mono text-[10px] text-primary">01 / ALLOW</div><div className="mt-1 text-xs font-medium">Allow the dashboard URL</div><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">In MT5, open Tools → Options → Expert Advisors and add this site to the WebRequest allowlist.</p></div>
+              <div className="rounded-lg border border-border/80 bg-card/75 p-3"><div className="mono text-[10px] text-primary">02 / MAP</div><div className="mt-1 text-xs font-medium">Keep each magic number</div><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">The EA sends closed trades with magic_number, close_time, and profit.</p></div>
+              <div className="rounded-lg border border-border/80 bg-card/75 p-3"><div className="mono text-[10px] text-primary">03 / POST</div><div className="mt-1 text-xs font-medium">Send trade history</div><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">POST JSON with Content-Type: application/json. Repeated tickets are ignored per account.</p></div>
+            </div>
+          </> : <>
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[.17em] text-primary">No active strategy history</div>
+            <h3 className="font-display text-[22px] font-bold tracking-[-.05em] sm:text-[27px]">All strategy history is paused.</h3>
+            <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-muted-foreground">Re-enable a magic number above to accept future MT5 trades. Its strategy card will return after a new trade is submitted; deleted history cannot be recovered.</p>
+          </>}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => query.refetch()} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90" data-testid="button-check-for-trades"><RefreshCw size={13}/> Check for trades</button>
             <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground"><ExternalLink size={12}/> No sample metrics are shown.</span>

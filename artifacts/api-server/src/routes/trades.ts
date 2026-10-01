@@ -1,16 +1,33 @@
-import { asc } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   ClearTradesResponse,
   GetTradesDashboardResponse,
   IngestTradesBody,
   IngestTradesResponse,
+  PauseMagicNumberResponse,
+  ResumeMagicNumberResponse,
 } from "@workspace/api-zod";
-import { db, mt5TradesTable } from "@workspace/db";
+import {
+  db,
+  mt5StrategyTrackingTable,
+  mt5TradesTable,
+} from "@workspace/db";
 import { calculateTradeMetrics } from "../lib/trade-metrics";
 
 const router: IRouter = Router();
 const INSERT_BATCH_SIZE = 500;
+const POSTGRES_INTEGER_MIN = -2_147_483_648;
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
+
+function parseMagicNumber(value: string): number | null {
+  const magicNumber = Number(value);
+  return Number.isInteger(magicNumber)
+    && magicNumber >= POSTGRES_INTEGER_MIN
+    && magicNumber <= POSTGRES_INTEGER_MAX
+    ? magicNumber
+    : null;
+}
 
 router.post("/trades", async (req, res): Promise<void> => {
   const parsed = IngestTradesBody.safeParse(req.body);
@@ -38,29 +55,114 @@ router.post("/trades", async (req, res): Promise<void> => {
     netProfit: trade.profit + trade.commission + trade.swap,
     comment: trade.comment ?? null,
   }));
+  const magicNumbers = [...new Set(rows.map((trade) => trade.magicNumber))]
+    .sort((a, b) => a - b);
+  let ignored = 0;
 
-  for (let offset = 0; offset < rows.length; offset += INSERT_BATCH_SIZE) {
-    const batch = rows.slice(offset, offset + INSERT_BATCH_SIZE);
-    const result = await db
-      .insert(mt5TradesTable)
-      .values(batch)
-      .onConflictDoNothing({
-        target: [mt5TradesTable.accountId, mt5TradesTable.ticket],
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(mt5StrategyTrackingTable)
+      .values(magicNumbers.map((magicNumber) => ({ magicNumber })))
+      .onConflictDoNothing();
+
+    const tracking = await tx
+      .select({
+        magicNumber: mt5StrategyTrackingTable.magicNumber,
+        isMonitored: mt5StrategyTrackingTable.isMonitored,
       })
-      .returning({ id: mt5TradesTable.id });
-    inserted += result.length;
-  }
+      .from(mt5StrategyTrackingTable)
+      .where(inArray(mt5StrategyTrackingTable.magicNumber, magicNumbers))
+      .orderBy(asc(mt5StrategyTrackingTable.magicNumber))
+      .for("update");
+    const pausedMagicNumbers = new Set(
+      tracking
+        .filter((setting) => !setting.isMonitored)
+        .map((setting) => setting.magicNumber),
+    );
+    const trackedRows = rows.filter(
+      (trade) => !pausedMagicNumbers.has(trade.magicNumber),
+    );
+    ignored = rows.length - trackedRows.length;
+
+    for (
+      let offset = 0;
+      offset < trackedRows.length;
+      offset += INSERT_BATCH_SIZE
+    ) {
+      const batch = trackedRows.slice(offset, offset + INSERT_BATCH_SIZE);
+      const result = await tx
+        .insert(mt5TradesTable)
+        .values(batch)
+        .onConflictDoNothing({
+          target: [mt5TradesTable.accountId, mt5TradesTable.ticket],
+        })
+        .returning({ id: mt5TradesTable.id });
+      inserted += result.length;
+    }
+  });
 
   res.json(IngestTradesResponse.parse({
     received,
     inserted,
-    duplicates: received - inserted,
+    duplicates: received - inserted - ignored,
+    ignored,
   }));
 });
 
 router.delete("/trades", async (_req, res): Promise<void> => {
   await db.delete(mt5TradesTable);
   res.json(ClearTradesResponse.parse({ cleared: true }));
+});
+
+router.delete("/trades/magic/:magicNumber", async (req, res): Promise<void> => {
+  const magicNumber = parseMagicNumber(req.params.magicNumber);
+  if (magicNumber == null) {
+    res.status(400).json({ error: "magicNumber must be a valid 32-bit integer" });
+    return;
+  }
+
+  const deletedTrades = await db.transaction(async (tx) => {
+    await tx
+      .insert(mt5StrategyTrackingTable)
+      .values({ magicNumber, isMonitored: false })
+      .onConflictDoUpdate({
+        target: mt5StrategyTrackingTable.magicNumber,
+        set: { isMonitored: false, updatedAt: new Date() },
+      });
+    const deleted = await tx
+      .delete(mt5TradesTable)
+      .where(eq(mt5TradesTable.magicNumber, magicNumber))
+      .returning({ id: mt5TradesTable.id });
+    return deleted.length;
+  });
+
+  res.json(PauseMagicNumberResponse.parse({
+    magicNumber,
+    monitoring: false,
+    deletedTrades,
+  }));
+});
+
+router.put("/trades/magic/:magicNumber", async (req, res): Promise<void> => {
+  const magicNumber = parseMagicNumber(req.params.magicNumber);
+  if (magicNumber == null) {
+    res.status(400).json({ error: "magicNumber must be a valid 32-bit integer" });
+    return;
+  }
+
+  await db
+    .insert(mt5StrategyTrackingTable)
+    .values({ magicNumber, isMonitored: true })
+    .onConflictDoUpdate({
+      target: mt5StrategyTrackingTable.magicNumber,
+      set: { isMonitored: true, updatedAt: new Date() },
+    });
+
+  res.json(ResumeMagicNumberResponse.parse({
+    magicNumber,
+    monitoring: true,
+    deletedTrades: 0,
+  }));
 });
 
 router.get("/trades/dashboard", async (_req, res): Promise<void> => {
@@ -74,6 +176,12 @@ router.get("/trades/dashboard", async (_req, res): Promise<void> => {
     })
     .from(mt5TradesTable)
     .orderBy(asc(mt5TradesTable.closeTime), asc(mt5TradesTable.id));
+
+  const pausedMagicNumbers = await db
+    .select({ magicNumber: mt5StrategyTrackingTable.magicNumber })
+    .from(mt5StrategyTrackingTable)
+    .where(eq(mt5StrategyTrackingTable.isMonitored, false))
+    .orderBy(asc(mt5StrategyTrackingTable.magicNumber));
 
   const byMagicNumber = new Map<number, typeof trades>();
   for (const trade of trades) {
@@ -117,6 +225,7 @@ router.get("/trades/dashboard", async (_req, res): Promise<void> => {
         magicNumberCount: strategies.length,
       },
       strategies,
+      pausedMagicNumbers: pausedMagicNumbers.map((entry) => entry.magicNumber),
       latestTradeAt: trades.length > 0 ? trades[trades.length - 1].closeTime : null,
     }),
   );

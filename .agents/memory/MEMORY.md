@@ -1,0 +1,1 @@
+- [MT5 magic-number tracking](mt5-magic-number-tracking.md) — preserve global pause semantics and serialize ingestion with pause/delete operations.

@@ -10,4 +10,6 @@ export interface TradeIngestResult {
   received: number;
   inserted: number;
   duplicates: number;
+  /** Trades not stored because their magic number is paused. */
+  ignored: number;
 }

@@ -11,6 +11,7 @@ export * from './dashboardTotals';
 export * from './equityPoint';
 export * from './errorResponse';
 export * from './healthStatus';
+export * from './magicNumberTrackingResult';
 export * from './mt5TradeInput';
 export * from './strategyPerformance';
 export * from './tradeBatchInput';

@@ -23,6 +23,7 @@ import type {
   ClearTradesResult,
   ErrorResponse,
   HealthStatus,
+  MagicNumberTrackingResult,
   TradeBatchInput,
   TradeDashboard,
   TradeIngestResult
@@ -142,7 +143,7 @@ export const getIngestTradesUrl = () => {
 }
 
 /**
- * Accepts closed trades. Trades are grouped by magic_number; profit, commission, and swap are combined into net profit.
+ * Accepts closed trades. Paused magic numbers are ignored; active trades are grouped by magic_number and profit, commission, and swap are combined into net profit.
  * @summary Ingest trade history from an MT5 Expert Advisor
  */
 export const ingestTrades = async (tradeBatchInput: TradeBatchInput, options?: Parameters<typeof customFetch>[1]): Promise<TradeIngestResult> => {
@@ -295,6 +296,156 @@ export const useClearTrades = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getClearTradesMutationOptions(options));
+    }
+
+export const getPauseMagicNumberUrl = (magicNumber: number,) => {
+
+
+
+
+  return `/api/trades/magic/${magicNumber}`
+}
+
+/**
+ * Pauses this magic number across all accounts, deletes its stored trades, and ignores future ingested trades until resumed.
+ * @summary Stop monitoring a magic number and clear its history
+ */
+export const pauseMagicNumber = async (magicNumber: number, options?: Parameters<typeof customFetch>[1]): Promise<MagicNumberTrackingResult> => {
+
+  return customFetch<MagicNumberTrackingResult>(getPauseMagicNumberUrl(magicNumber),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getPauseMagicNumberMutationKey = () => ['pauseMagicNumber'] as const;
+
+export const getPauseMagicNumberMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pauseMagicNumber>>, TError,PauseMagicNumberMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof pauseMagicNumber>>, TError,PauseMagicNumberMutationVariables, TContext> => {
+
+const mutationKey = getPauseMagicNumberMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof pauseMagicNumber>>, PauseMagicNumberMutationVariables> = (props) => {
+          const {magicNumber} = props ?? {};
+
+          return  pauseMagicNumber(magicNumber,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PauseMagicNumberMutationResult = NonNullable<Awaited<ReturnType<typeof pauseMagicNumber>>>
+
+    export type PauseMagicNumberMutationError = ErrorType<ErrorResponse>
+    export type PauseMagicNumberMutationVariables = {magicNumber: number}
+
+    /**
+ * @summary Stop monitoring a magic number and clear its history
+ */
+export const usePauseMagicNumber = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pauseMagicNumber>>, TError,PauseMagicNumberMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof pauseMagicNumber>>,
+        TError,
+        PauseMagicNumberMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPauseMagicNumberMutationOptions(options));
+    }
+
+export const getResumeMagicNumberUrl = (magicNumber: number,) => {
+
+
+
+
+  return `/api/trades/magic/${magicNumber}`
+}
+
+/**
+ * Re-enables ingestion for this magic number. New trades will appear after MT5 submits them.
+ * @summary Resume monitoring a magic number
+ */
+export const resumeMagicNumber = async (magicNumber: number, options?: Parameters<typeof customFetch>[1]): Promise<MagicNumberTrackingResult> => {
+
+  return customFetch<MagicNumberTrackingResult>(getResumeMagicNumberUrl(magicNumber),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+
+export const getResumeMagicNumberMutationKey = () => ['resumeMagicNumber'] as const;
+
+export const getResumeMagicNumberMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resumeMagicNumber>>, TError,ResumeMagicNumberMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resumeMagicNumber>>, TError,ResumeMagicNumberMutationVariables, TContext> => {
+
+const mutationKey = getResumeMagicNumberMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resumeMagicNumber>>, ResumeMagicNumberMutationVariables> = (props) => {
+          const {magicNumber} = props ?? {};
+
+          return  resumeMagicNumber(magicNumber,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResumeMagicNumberMutationResult = NonNullable<Awaited<ReturnType<typeof resumeMagicNumber>>>
+
+    export type ResumeMagicNumberMutationError = ErrorType<ErrorResponse>
+    export type ResumeMagicNumberMutationVariables = {magicNumber: number}
+
+    /**
+ * @summary Resume monitoring a magic number
+ */
+export const useResumeMagicNumber = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resumeMagicNumber>>, TError,ResumeMagicNumberMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resumeMagicNumber>>,
+        TError,
+        ResumeMagicNumberMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResumeMagicNumberMutationOptions(options));
     }
 
 export const getGetTradesDashboardUrl = () => {

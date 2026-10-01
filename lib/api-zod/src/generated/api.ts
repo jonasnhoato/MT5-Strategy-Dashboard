@@ -18,7 +18,7 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * Accepts closed trades. Trades are grouped by magic_number; profit, commission, and swap are combined into net profit.
+ * Accepts closed trades. Paused magic numbers are ignored; active trades are grouped by magic_number and profit, commission, and swap are combined into net profit.
  * @summary Ingest trade history from an MT5 Expert Advisor
  */
 export const ingestTradesBodyAccountIdMax = 120;
@@ -61,7 +61,8 @@ export const IngestTradesBody = zod.object({
 export const IngestTradesResponse = zod.object({
   "received": zod.number().int(),
   "inserted": zod.number().int(),
-  "duplicates": zod.number().int()
+  "duplicates": zod.number().int(),
+  "ignored": zod.number().int().describe('Trades not stored because their magic number is paused.')
 })
 
 
@@ -71,6 +72,36 @@ export const IngestTradesResponse = zod.object({
  */
 export const ClearTradesResponse = zod.object({
   "cleared": zod.boolean()
+})
+
+
+/**
+ * Pauses this magic number across all accounts, deletes its stored trades, and ignores future ingested trades until resumed.
+ * @summary Stop monitoring a magic number and clear its history
+ */
+export const PauseMagicNumberParams = zod.object({
+  "magicNumber": zod.coerce.number().int()
+})
+
+export const PauseMagicNumberResponse = zod.object({
+  "magicNumber": zod.number().int(),
+  "monitoring": zod.boolean(),
+  "deletedTrades": zod.number().int()
+})
+
+
+/**
+ * Re-enables ingestion for this magic number. New trades will appear after MT5 submits them.
+ * @summary Resume monitoring a magic number
+ */
+export const ResumeMagicNumberParams = zod.object({
+  "magicNumber": zod.coerce.number().int()
+})
+
+export const ResumeMagicNumberResponse = zod.object({
+  "magicNumber": zod.number().int(),
+  "monitoring": zod.boolean(),
+  "deletedTrades": zod.number().int()
 })
 
 
@@ -109,6 +140,7 @@ export const GetTradesDashboardResponse = zod.object({
   "cumulativeProfit": zod.number()
 }))
 })),
+  "pausedMagicNumbers": zod.array(zod.number().int()),
   "latestTradeAt": zod.coerce.date().nullable()
 })
 

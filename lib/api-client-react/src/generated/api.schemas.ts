@@ -50,10 +50,18 @@ export interface TradeIngestResult {
   received: number;
   inserted: number;
   duplicates: number;
+  /** Trades not stored because their magic number is paused. */
+  ignored: number;
 }
 
 export interface ClearTradesResult {
   cleared: boolean;
+}
+
+export interface MagicNumberTrackingResult {
+  magicNumber: number;
+  monitoring: boolean;
+  deletedTrades: number;
 }
 
 export interface DashboardTotals {
@@ -101,6 +109,7 @@ export interface StrategyPerformance {
 export interface TradeDashboard {
   totals: DashboardTotals;
   strategies: StrategyPerformance[];
+  pausedMagicNumbers: number[];
   /** @nullable */
   latestTradeAt: string | null;
 }

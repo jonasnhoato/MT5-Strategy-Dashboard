@@ -31,7 +31,7 @@ paths:
       operationId: ingestTrades
       tags: [trades]
       summary: Ingest trade history from an MT5 Expert Advisor
-      description: Accepts closed trades. Trades are grouped by magic_number; profit, commission, and swap are combined into net profit.
+      description: Accepts closed trades. Paused magic numbers are ignored; active trades are grouped by magic_number and profit, commission, and swap are combined into net profit.
       requestBody:
         required: true
         content:
@@ -63,6 +63,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ClearTradesResult"
+  /trades/magic/{magicNumber}:
+    parameters:
+      - name: magicNumber
+        in: path
+        required: true
+        schema:
+          type: integer
+    delete:
+      operationId: pauseMagicNumber
+      tags: [trades]
+      summary: Stop monitoring a magic number and clear its history
+      description: Pauses this magic number across all accounts, deletes its stored trades, and ignores future ingested trades until resumed.
+      responses:
+        "200":
+          description: Magic number paused and its trade history removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MagicNumberTrackingResult"
+        "400":
+          description: Invalid magic number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: resumeMagicNumber
+      tags: [trades]
+      summary: Resume monitoring a magic number
+      description: Re-enables ingestion for this magic number. New trades will appear after MT5 submits them.
+      responses:
+        "200":
+          description: Magic number monitoring resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MagicNumberTrackingResult"
+        "400":
+          description: Invalid magic number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /trades/dashboard:
     get:
       operationId: getTradesDashboard
@@ -154,13 +197,26 @@ components:
           type: integer
         duplicates:
           type: integer
-      required: [received, inserted, duplicates]
+        ignored:
+          type: integer
+          description: Trades not stored because their magic number is paused.
+      required: [received, inserted, duplicates, ignored]
     ClearTradesResult:
       type: object
       properties:
         cleared:
           type: boolean
       required: [cleared]
+    MagicNumberTrackingResult:
+      type: object
+      properties:
+        magicNumber:
+          type: integer
+        monitoring:
+          type: boolean
+        deletedTrades:
+          type: integer
+      required: [magicNumber, monitoring, deletedTrades]
     DashboardTotals:
       type: object
       properties:
@@ -240,8 +296,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/StrategyPerformance"
+        pausedMagicNumbers:
+          type: array
+          items:
+            type: integer
         latestTradeAt:
           type: [string, "null"]
           format: date-time
-      required: [totals, strategies, latestTradeAt]
+      required: [totals, strategies, pausedMagicNumbers, latestTradeAt]
 
