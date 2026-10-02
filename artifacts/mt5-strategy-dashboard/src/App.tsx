@@ -14,6 +14,7 @@ import {
   getGetTradesDashboardQueryKey, useClearTrades, useGetTradesDashboard,
   usePauseMagicNumber, useResumeMagicNumber,
 } from '@workspace/api-client-react';
+import { previewDemoDashboard } from '@/lib/preview-demo';
 import type { StrategyPerformance } from '@workspace/api-client-react';
 import {
   Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip,
@@ -66,6 +67,7 @@ const timestamp = (value?: number) => value
   : 'Waiting for first sync';
 
 const STRATEGY_ORDER_STORAGE_KEY = 'mt5-strategy-dashboard-order-v1';
+const isPreviewDemo = import.meta.env.DEV;
 
 function readSavedStrategyOrder() {
   try {
