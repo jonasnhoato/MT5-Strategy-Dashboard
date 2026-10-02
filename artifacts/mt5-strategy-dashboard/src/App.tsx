@@ -156,7 +156,9 @@ function StrategyPanel({
   strategyCount,
   onMove,
   onReorder,
-  onDragStateChange,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
   isDragging,
   isDropTarget,
 }: {
@@ -168,7 +170,9 @@ function StrategyPanel({
   strategyCount: number;
   onMove: (direction: -1 | 1) => void;
   onReorder: (source: number, target: number) => void;
-  onDragStateChange: (magicNumber: number | null) => void;
+  onDragStart: (magicNumber: number) => void;
+  onDragEnd: () => void;
+  onDragOver: (magicNumber: number) => void;
   isDragging: boolean;
   isDropTarget: boolean;
 }) {
@@ -182,7 +186,6 @@ function StrategyPanel({
     { label: 'Profit factor', value: pfLabel(strategy.profitFactor, strategy), tone: 'neutral' },
   ] as const;
   const detailStats = [
-    ['Profit factor', pfLabel(strategy.profitFactor, strategy)],
     ['Max drawdown', money(strategy.maxDrawdown)],
     ['Avg net / trade', money(strategy.tradeCount > 0 ? strategy.netProfit / strategy.tradeCount : 0)],
     ['Sharpe ratio', metric(strategy.sharpeRatio)],
@@ -197,15 +200,16 @@ function StrategyPanel({
     onDragOver={(event) => {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
-      if (!isDropTarget) onDragStateChange(strategy.magicNumber);
+      if (!isDropTarget) onDragOver(strategy.magicNumber);
     }}
     onDrop={(event) => {
       event.preventDefault();
-      const source = Number(event.dataTransfer.getData('text/plain'));
-      if (Number.isSafeInteger(source) && source !== strategy.magicNumber) {
+      const sourceValue = event.dataTransfer.getData('text/plain');
+      const source = Number(sourceValue);
+      if (sourceValue && Number.isSafeInteger(source) && source !== strategy.magicNumber) {
         onReorder(source, strategy.magicNumber);
       }
-      onDragStateChange(null);
+      onDragEnd();
     }}
   >
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/80 px-4 py-3.5">
@@ -234,9 +238,9 @@ function StrategyPanel({
           onDragStart={(event) => {
             event.dataTransfer.effectAllowed = 'move';
             event.dataTransfer.setData('text/plain', String(strategy.magicNumber));
-            onDragStateChange(strategy.magicNumber);
+            onDragStart(strategy.magicNumber);
           }}
-          onDragEnd={() => onDragStateChange(null)}
+          onDragEnd={onDragEnd}
           className="inline-flex h-8 w-8 cursor-grab items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground transition hover:border-primary/40 hover:text-foreground active:cursor-grabbing"
           aria-label={`Drag magic number ${strategy.magicNumber} to reorder`}
           title="Drag to reorder"
@@ -297,8 +301,9 @@ function StrategyPanel({
         <span>{expanded ? 'Hide full details' : 'View full details'}</span>
         <ChevronDown size={14} className={`text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}/>
       </button>
-      {expanded && <div id={detailsId} className="mt-3 border-t border-border/70 pt-3">
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border/70 bg-border/60 sm:grid-cols-3 xl:grid-cols-6">
+      <div id={detailsId} hidden={!expanded} className={`mt-3 border-t border-border/70 pt-3 ${expanded ? '' : 'hidden'}`}>
+        {expanded && <>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border/70 bg-border/60 sm:grid-cols-3 xl:grid-cols-5">
           {detailStats.map(([label, value]) => <div key={label} className="min-w-0 bg-card/95 px-3 py-2.5">
             <div className="metric-label !text-[9px]">{label}</div>
             <div className="mono mt-1.5 truncate text-[12px] font-medium text-foreground">{value}</div>
@@ -314,7 +319,8 @@ function StrategyPanel({
           </div>
           <EquityChart strategy={strategy} light={light}/>
         </div>
-      </div>}
+        </>}
+      </div>
     </div>
   </section>;
 }
@@ -332,6 +338,10 @@ function Home() {
   const [strategyActionError, setStrategyActionError] = useState<string | null>(null);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [trackingNotice, setTrackingNotice] = useState<string | null>(null);
+  const [pausedStrategiesOpen, setPausedStrategiesOpen] = useState(true);
+  const [strategyOrder, setStrategyOrder] = useState<number[]>(readSavedStrategyOrder);
+  const [draggedMagicNumber, setDraggedMagicNumber] = useState<number | null>(null);
+  const [dropTargetMagicNumber, setDropTargetMagicNumber] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const query = useGetTradesDashboard({
     query: {
@@ -405,7 +415,34 @@ function Home() {
     document.addEventListener('mousedown', closeOutside);
     return () => document.removeEventListener('mousedown', closeOutside);
   }, []);
-  const orderedStrategies = useMemo(() => data ? [...data.strategies].sort((a, b) => b.netProfit - a.netProfit) : [], [data]);
+  useEffect(() => {
+    if (!strategyOrder.length) return;
+    try {
+      window.localStorage.setItem(STRATEGY_ORDER_STORAGE_KEY, JSON.stringify(strategyOrder));
+    } catch {
+      console.warn('Strategy order could not be saved in this browser.');
+    }
+  }, [strategyOrder]);
+  const orderedStrategies = useMemo(() => {
+    if (!data) return [];
+    const remaining = new Map(data.strategies.map((strategy) => [strategy.magicNumber, strategy]));
+    const saved = strategyOrder.flatMap((magicNumber) => {
+      const strategy = remaining.get(magicNumber);
+      if (!strategy) return [];
+      remaining.delete(magicNumber);
+      return [strategy];
+    });
+    return [...saved, ...[...remaining.values()].sort((a, b) => b.netProfit - a.netProfit)];
+  }, [data, strategyOrder]);
+  const reorderStrategy = (source: number, target: number) => {
+    const order = orderedStrategies.map((strategy) => strategy.magicNumber);
+    const sourceIndex = order.indexOf(source);
+    const targetIndex = order.indexOf(target);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+    const [moved] = order.splice(sourceIndex, 1);
+    order.splice(targetIndex, 0, moved);
+    setStrategyOrder(order);
+  };
 
   return <main className="dashboard-shell min-h-[100dvh] bg-background">
     <div className="mx-auto max-w-[1480px] px-4 pb-12 pt-4 sm:px-6 sm:pt-6 lg:px-9">
@@ -580,15 +617,25 @@ function Home() {
       </section>
 
       <div className="mb-3 mt-8 flex flex-wrap items-end justify-between gap-2">
-        <div><div className="flex items-center gap-2"><BarChart3 size={15} className="text-primary"/><h2 className="text-[13px] font-semibold tracking-wide">STRATEGY BREAKDOWN</h2></div><p className="mt-1 text-[10px] text-muted-foreground">One performance profile per MT5 magic number.</p></div>
+        <div><div className="flex items-center gap-2"><BarChart3 size={15} className="text-primary"/><h2 className="text-[13px] font-semibold tracking-wide">STRATEGY BREAKDOWN</h2></div><p className="mt-1 text-[10px] text-muted-foreground">Drag cards to reorder · order saved in this browser.</p></div>
         {hasData && <span className="mono text-[10px] text-muted-foreground">{orderedStrategies.length} {orderedStrategies.length === 1 ? 'strategy' : 'strategies'}</span>}
       </div>
-      {pausedMagicNumbers.length > 0 && <section className="panel mb-4 rounded-xl p-4 sm:p-5" aria-label="Paused strategies" data-testid="panel-paused-strategies">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      {pausedMagicNumbers.length > 0 && <details
+        open={pausedStrategiesOpen}
+        onToggle={(event) => setPausedStrategiesOpen(event.currentTarget.open)}
+        className="panel mb-4 overflow-hidden rounded-xl"
+        aria-label="Paused strategies"
+        data-testid="panel-paused-strategies"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 sm:p-5" data-testid="toggle-paused-strategies">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold">Paused strategies</h3>
-            <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-muted-foreground">New MT5 trades for these magic numbers are ignored. Re-enabling starts collecting new trades again; deleted history will not return.</p>
+            <div className="flex items-center gap-2"><h3 className="text-sm font-semibold">Paused strategies</h3><span className="mono rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] text-muted-foreground">{pausedMagicNumbers.length}</span></div>
+            <p className="mt-1 text-[11px] text-muted-foreground">Re-enable magic numbers to accept future MT5 uploads.</p>
           </div>
+          <ChevronDown size={16} className={`shrink-0 text-muted-foreground transition-transform ${pausedStrategiesOpen ? 'rotate-180' : ''}`}/>
+        </summary>
+        <div className="border-t border-border/70 p-4 sm:px-5">
+          <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">New MT5 trades for these magic numbers are ignored. Re-enabling starts collecting new trades again; deleted history will not return.</p>
           <div className="flex flex-wrap gap-2">
             {pausedMagicNumbers.map((magicNumber) => {
               const isResuming = resumeMagicNumberMutation.isPending
@@ -611,7 +658,7 @@ function Home() {
           </div>
         </div>
         {resumeError && <p role="alert" className="mt-3 text-xs text-destructive" data-testid="status-resume-strategy-error">{resumeError}</p>}
-      </section>}
+      </details>}
       {loading && !data ? <div className="space-y-3" aria-label="Loading dashboard">
         {[0, 1].map((item) => <div key={item} className="panel animate-pulse rounded-2xl p-5">
           <div className="flex justify-between"><div className="h-5 w-44 rounded bg-muted"/><div className="h-6 w-24 rounded bg-muted"/></div>
@@ -619,11 +666,29 @@ function Home() {
           <div className="mt-5 h-48 rounded-lg bg-muted/60"/>
         </div>)}
       </div> : null}
-      {hasData && orderedStrategies.length > 0 && <div className="space-y-3.5">
-        {orderedStrategies.map((strategy) => <StrategyPanel
+      {hasData && orderedStrategies.length > 0 && <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {orderedStrategies.map((strategy, index) => <StrategyPanel
           key={strategy.magicNumber}
           strategy={strategy}
           light={light}
+          orderIndex={index}
+          strategyCount={orderedStrategies.length}
+          onMove={(direction) => {
+            const target = orderedStrategies[index + direction];
+            if (target) reorderStrategy(strategy.magicNumber, target.magicNumber);
+          }}
+          onReorder={reorderStrategy}
+          onDragStart={(magicNumber) => {
+            setDraggedMagicNumber(magicNumber);
+            setDropTargetMagicNumber(null);
+          }}
+          onDragOver={setDropTargetMagicNumber}
+          onDragEnd={() => {
+            setDraggedMagicNumber(null);
+            setDropTargetMagicNumber(null);
+          }}
+          isDragging={draggedMagicNumber === strategy.magicNumber}
+          isDropTarget={dropTargetMagicNumber === strategy.magicNumber && draggedMagicNumber !== strategy.magicNumber}
           onPause={(selected) => {
             setStrategyActionError(null);
             setStrategyToPause(selected);
