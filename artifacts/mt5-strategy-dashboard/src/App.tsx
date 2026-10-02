@@ -20,8 +20,9 @@ import {
 } from 'recharts';
 import {
   Activity, AlertCircle, ArrowDownRight, ArrowUpRight, BarChart3, Check,
-  ChevronDown, CircleHelp, Clock3, Download, ExternalLink, Moon, Printer,
-  RefreshCw, Sun, Trash2, TrendingUp, WalletCards, X,
+  ChevronDown, ChevronUp, CircleHelp, Clock3, Download, ExternalLink,
+  GripVertical, Moon, Printer, RefreshCw, Sun, Trash2, TrendingUp,
+  WalletCards, X,
 } from 'lucide-react';
 import {
   Route,
@@ -63,6 +64,21 @@ const dateLabel = (value: string) => {
 const timestamp = (value?: number) => value
   ? new Date(value).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   : 'Waiting for first sync';
+
+const STRATEGY_ORDER_STORAGE_KEY = 'mt5-strategy-dashboard-order-v1';
+
+function readSavedStrategyOrder() {
+  try {
+    const saved = window.localStorage.getItem(STRATEGY_ORDER_STORAGE_KEY);
+    if (!saved) return [];
+    const parsed: unknown = JSON.parse(saved);
+    return Array.isArray(parsed)
+      ? [...new Set(parsed.filter((value): value is number => Number.isSafeInteger(value)))]
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 const equityCsvHeaders = [
   { label: 'close_time', key: 'closeTime' },
@@ -131,86 +147,174 @@ function EquityChart({ strategy, light }: { strategy: StrategyPerformance; light
   </div>;
 }
 
-function StrategyPanel({ strategy, light, onPause, pausePending }: {
+function StrategyPanel({
+  strategy,
+  light,
+  onPause,
+  pausePending,
+  orderIndex,
+  strategyCount,
+  onMove,
+  onReorder,
+  onDragStateChange,
+  isDragging,
+  isDropTarget,
+}: {
   strategy: StrategyPerformance;
   light: boolean;
   onPause: (strategy: StrategyPerformance) => void;
   pausePending: boolean;
+  orderIndex: number;
+  strategyCount: number;
+  onMove: (direction: -1 | 1) => void;
+  onReorder: (source: number, target: number) => void;
+  onDragStateChange: (magicNumber: number | null) => void;
+  isDragging: boolean;
+  isDropTarget: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const positive = strategy.netProfit >= 0;
   const symbols = strategy.symbols ?? [];
-  const stat = [
+  const summaryStats = [
+    { label: 'Net profit', value: money(strategy.netProfit), tone: positive ? 'positive' : 'negative' },
+    { label: 'Closed trades', value: strategy.tradeCount.toLocaleString(), tone: 'neutral' },
+    { label: 'Win rate', value: percent(strategy.winRate), tone: 'neutral' },
+    { label: 'Profit factor', value: pfLabel(strategy.profitFactor, strategy), tone: 'neutral' },
+  ] as const;
+  const detailStats = [
     ['Profit factor', pfLabel(strategy.profitFactor, strategy)],
-    ['Win rate', percent(strategy.winRate)],
     ['Max drawdown', money(strategy.maxDrawdown)],
     ['Avg net / trade', money(strategy.tradeCount > 0 ? strategy.netProfit / strategy.tradeCount : 0)],
     ['Sharpe ratio', metric(strategy.sharpeRatio)],
     ['Payout ratio', strategy.payoutRatio == null ? '—' : `${metric(strategy.payoutRatio)}×`],
     ['Wins / losses', `${strategy.wins} / ${strategy.losses}`],
   ];
-  return <section className="panel overflow-hidden rounded-2xl" data-testid={`strategy-${strategy.magicNumber}`}>
-    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/80 px-5 py-4 md:px-6">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary"><Activity size={17}/></div>
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-display font-semibold tracking-[-.03em] text-[17px]">Magic number <span className="mono text-primary">{strategy.magicNumber}</span></h2>
+  const detailsId = `strategy-details-${strategy.magicNumber}`;
+
+  return <section
+    className={`panel overflow-hidden rounded-2xl transition-shadow ${expanded ? 'sm:col-span-2 xl:col-span-3' : ''} ${isDropTarget ? 'ring-2 ring-primary/60' : ''} ${isDragging ? 'opacity-60' : ''}`}
+    data-testid={`strategy-${strategy.magicNumber}`}
+    onDragOver={(event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      if (!isDropTarget) onDragStateChange(strategy.magicNumber);
+    }}
+    onDrop={(event) => {
+      event.preventDefault();
+      const source = Number(event.dataTransfer.getData('text/plain'));
+      if (Number.isSafeInteger(source) && source !== strategy.magicNumber) {
+        onReorder(source, strategy.magicNumber);
+      }
+      onDragStateChange(null);
+    }}
+  >
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/80 px-4 py-3.5">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary"><Activity size={16}/></div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="font-display text-[14px] font-semibold tracking-[-.03em]">Magic <span className="mono text-primary">{strategy.magicNumber}</span></h3>
             {symbols.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5" aria-label={`Assets traded by magic number ${strategy.magicNumber}`}>
-                <span className="mr-0.5 text-[9px] font-semibold uppercase tracking-[.14em] text-muted-foreground">Assets</span>
+              <div className="flex flex-wrap items-center gap-1" aria-label={`Assets traded by magic number ${strategy.magicNumber}`}>
                 {symbols.map((symbol) => (
-                  <span key={symbol} title={`Traded asset: ${symbol}`} className="inline-flex items-center rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-bold tracking-wide text-primary">
-                    {symbol}
-                  </span>
+                  <span key={symbol} title={`Traded asset: ${symbol}`} className="inline-flex items-center rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wide text-primary">{symbol}</span>
                 ))}
               </div>
             ) : (
-              <span className="rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">No ticker data</span>
+              <span className="rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">No ticker data</span>
             )}
-            <span className="rounded-full border border-border bg-muted/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{strategy.tradeCount} trades</span>
           </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Expert Advisor performance · {strategy.breakeven} breakeven</p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">Expert Advisor · {strategy.breakeven} breakeven</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="text-right">
-          <div className="metric-label">Net profit</div>
-          <div className={`mono mt-0.5 text-[19px] font-medium ${positive ? 'text-emerald-300' : 'text-rose-300'}`}>{money(strategy.netProfit)}</div>
+      <div className="print-hidden flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          draggable
+          onDragStart={(event) => {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', String(strategy.magicNumber));
+            onDragStateChange(strategy.magicNumber);
+          }}
+          onDragEnd={() => onDragStateChange(null)}
+          className="inline-flex h-8 w-8 cursor-grab items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground transition hover:border-primary/40 hover:text-foreground active:cursor-grabbing"
+          aria-label={`Drag magic number ${strategy.magicNumber} to reorder`}
+          title="Drag to reorder"
+          data-testid={`button-drag-strategy-${strategy.magicNumber}`}
+        ><GripVertical size={15}/></button>
+        <div className="flex flex-col">
+          <button
+            type="button"
+            onClick={() => onMove(-1)}
+            disabled={orderIndex === 0}
+            className="flex h-4 w-6 items-center justify-center rounded-t border border-border bg-muted/40 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
+            aria-label={`Move magic number ${strategy.magicNumber} up`}
+            data-testid={`button-move-strategy-up-${strategy.magicNumber}`}
+          ><ChevronUp size={12}/></button>
+          <button
+            type="button"
+            onClick={() => onMove(1)}
+            disabled={orderIndex === strategyCount - 1}
+            className="-mt-px flex h-4 w-6 items-center justify-center rounded-b border border-border bg-muted/40 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
+            aria-label={`Move magic number ${strategy.magicNumber} down`}
+            data-testid={`button-move-strategy-down-${strategy.magicNumber}`}
+          ><ChevronDown size={12}/></button>
         </div>
         <button
           type="button"
           onClick={() => onPause(strategy)}
           disabled={pausePending}
-          className="print-hidden inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/[.07] px-2.5 text-xs font-medium text-rose-300 transition hover:border-rose-500/50 hover:bg-rose-500/[.12] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/[.07] px-2 text-[10px] font-medium text-rose-300 transition hover:border-rose-500/50 hover:bg-rose-500/[.12] disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`Stop monitoring and delete history for magic number ${strategy.magicNumber}`}
           title="Stop monitoring and delete this strategy's history"
           data-testid={`button-delete-strategy-${strategy.magicNumber}`}
-        ><Trash2 size={13}/><span>Delete</span></button>
+        ><Trash2 size={12}/><span>Delete</span></button>
         {strategy.equity.length > 0 && <CSVLink
           data={strategy.equity}
           headers={equityCsvHeaders}
           filename={`magic-${strategy.magicNumber}-net-profit-equity.csv`}
-          className="print-hidden inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-muted/50 px-2 text-[10px] text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
           aria-label={`Export magic number ${strategy.magicNumber} equity as CSV`}
           data-testid={`export-csv-${strategy.magicNumber}`}
-        ><Download size={14}/><span className="hidden sm:inline">CSV</span></CSVLink>}
+        ><Download size={12}/><span>CSV</span></CSVLink>}
       </div>
     </div>
-    <div className="grid grid-cols-2 gap-px border-b border-border/70 bg-border/60 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-7">
-      {stat.map(([label, value]) => <div key={label} className="bg-card/95 px-4 py-3">
+    <div className="grid grid-cols-2 gap-px bg-border/60">
+      {summaryStats.map(({ label, value, tone }) => <div key={label} className="min-w-0 bg-card/95 px-3 py-2.5">
         <div className="metric-label !text-[9px]">{label}</div>
-        <div className="mono mt-1.5 text-[13px] font-medium text-foreground">{value}</div>
+        <div className={`mono mt-1 truncate text-[13px] font-medium ${tone === 'positive' ? 'text-emerald-300' : tone === 'negative' ? 'text-rose-300' : 'text-foreground'}`}>{value}</div>
       </div>)}
     </div>
-    <div className="px-4 pb-4 pt-3 md:px-5 md:pb-5">
-      <div className="mb-2 flex items-center justify-between">
-        <div>
-          <div className="text-[12px] font-medium">Cumulative net profit</div>
-          <div className="mt-0.5 text-[10px] text-muted-foreground">Closed trades over time · account currency in USD</div>
+    <div className="px-3 pb-3 pt-2.5">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/80 bg-muted/35 px-3 py-2 text-left text-[11px] font-medium transition hover:border-primary/40 hover:bg-muted/60"
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        data-testid={`button-toggle-details-${strategy.magicNumber}`}
+      >
+        <span>{expanded ? 'Hide full details' : 'View full details'}</span>
+        <ChevronDown size={14} className={`text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}/>
+      </button>
+      {expanded && <div id={detailsId} className="mt-3 border-t border-border/70 pt-3">
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border/70 bg-border/60 sm:grid-cols-3 xl:grid-cols-6">
+          {detailStats.map(([label, value]) => <div key={label} className="min-w-0 bg-card/95 px-3 py-2.5">
+            <div className="metric-label !text-[9px]">{label}</div>
+            <div className="mono mt-1.5 truncate text-[12px] font-medium text-foreground">{value}</div>
+          </div>)}
         </div>
-        <span className="mono text-[10px] text-muted-foreground">{strategy.equity.length} points</span>
-      </div>
-      <EquityChart strategy={strategy} light={light}/>
+        <div className="pt-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[12px] font-medium">Cumulative net profit</div>
+              <div className="mt-0.5 text-[10px] text-muted-foreground">Closed trades over time · account currency in USD</div>
+            </div>
+            <span className="mono text-[10px] text-muted-foreground">{strategy.equity.length} points</span>
+          </div>
+          <EquityChart strategy={strategy} light={light}/>
+        </div>
+      </div>}
     </div>
   </section>;
 }
