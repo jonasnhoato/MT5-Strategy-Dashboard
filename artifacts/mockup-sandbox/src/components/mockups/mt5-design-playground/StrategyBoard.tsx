@@ -5,6 +5,7 @@ import {
   Pause, Play, Printer, RefreshCw, ShieldAlert, Sun, Trash2, WalletCards, X,
 } from 'lucide-react';
 import { fixture, money, percent, type StrategyPerformance } from './_fixture';
+import './strategy-board.css';
 
 type StrategyUnit = StrategyPerformance & { paused: boolean };
 
@@ -41,7 +42,7 @@ function EquityLine({ strategy, large = false }: { strategy: StrategyPerformance
     y: padY + ((high - point.cumulativeProfit) / range) * (height - padY * 2),
   }));
   const line = coords.map((point) => `${point.x},${point.y}`).join(' ');
-  const color = strategy.netProfit >= 0 ? '#9be27d' : '#e58d7e';
+  const color = strategy.netProfit >= 0 ? 'var(--sb-chart-profit)' : 'var(--sb-chart-loss)';
   const zeroY = padY + ((high - 0) / range) * (height - padY * 2);
   const firstDate = points[0].closeTime;
   const lastDate = points[points.length - 1].closeTime;
@@ -243,7 +244,7 @@ export function StrategyBoard() {
     }
   };
 
-  return <main className={`strategy-board ${light ? 'sb-light' : ''}`} data-testid="strategy-board">
+  return <main id="sb-current-root" className={`strategy-board ${light ? 'sb-light' : ''}`} data-testid="strategy-board">
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
       .strategy-board{--ink:#11191a;--surface:#192222;--surface2:#202b29;--line:#34413c;--text:#e8eee3;--muted:#9ba89d;--acid:#b8ee74;--acid-dark:#25351e;--red:#e58d7e;--amber:#efbd67;min-height:100dvh;background:radial-gradient(ellipse at 80% -20%,#26392b 0,transparent 40%),var(--ink);color:var(--text);font-family:'DM Sans',sans-serif;padding:22px clamp(14px,3.8vw,56px) 52px;position:relative;overflow:hidden}

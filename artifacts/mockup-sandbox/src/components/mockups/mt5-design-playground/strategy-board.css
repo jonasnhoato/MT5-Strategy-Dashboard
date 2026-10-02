@@ -1,0 +1,281 @@
+/*
+ * Strategy board preview skin. Scoped to this mockup so the shared sandbox
+ * theme and the production dashboard remain untouched.
+ */
+#sb-current-root {
+  color-scheme: dark;
+  --background: hsl(220 21% 9%);
+  --foreground: hsl(210 18% 91%);
+  --border: hsl(218 15% 20%);
+  --card: hsl(220 19% 12%);
+  --card-raised: hsl(220 19% 14%);
+  --popover: hsl(220 19% 13%);
+  --primary: hsl(158 54% 52%);
+  --primary-soft: hsl(158 40% 17%);
+  --muted: hsl(218 16% 16%);
+  --muted-surface: hsl(218 16% 16%);
+  --muted-foreground: hsl(216 10% 59%);
+  --destructive: hsl(4 65% 56%);
+  --warning: hsl(40 70% 63%);
+  --sb-chart-profit: #63d6a9;
+  --sb-chart-loss: #f08a81;
+  --sb-profit-text: #6ee7b7;
+  --sb-loss-text: #fda4af;
+  --ink: var(--background);
+  --surface: var(--card);
+  --surface2: var(--card-raised);
+  --line: var(--border);
+  --text: var(--foreground);
+  --muted: var(--muted-foreground);
+  --acid: var(--primary);
+  --acid-dark: var(--primary-soft);
+  --red: var(--destructive);
+  --amber: var(--warning);
+  min-height: 100dvh;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'DM Sans', sans-serif;
+}
+
+#sb-current-root.sb-light {
+  color-scheme: light;
+  --background: hsl(198 22% 96%);
+  --foreground: hsl(207 27% 15%);
+  --border: hsl(202 16% 85%);
+  --card: hsl(0 0% 100%);
+  --card-raised: hsl(198 18% 98%);
+  --popover: hsl(0 0% 100%);
+  --primary: hsl(158 58% 35%);
+  --primary-soft: hsl(158 35% 89%);
+  --muted: hsl(199 18% 92%);
+  --muted-surface: hsl(199 18% 92%);
+  --muted-foreground: hsl(207 12% 43%);
+  --destructive: hsl(4 63% 49%);
+  --warning: hsl(40 70% 42%);
+  --ink: var(--background);
+  --surface: var(--card);
+  --surface2: var(--card-raised);
+  --line: var(--border);
+  --text: var(--foreground);
+  --muted: hsl(207 12% 43%);
+  --acid: var(--primary);
+  --acid-dark: var(--primary-soft);
+  --red: var(--destructive);
+  --amber: var(--warning);
+}
+
+#sb-current-root.strategy-board {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+#sb-current-root.strategy-board::before { display: none; }
+#sb-current-root * { box-sizing: border-box; }
+#sb-current-root .sb-wrap { max-width: 1450px; }
+#sb-current-root button:focus-visible,
+#sb-current-root summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+#sb-current-root .sb-mark,
+#sb-current-root .sb-btn,
+#sb-current-root .sb-account-metric,
+#sb-current-root .sb-method,
+#sb-current-root .sb-unit,
+#sb-current-root .sb-stat-rail,
+#sb-current-root .sb-tiny-stat,
+#sb-current-root .sb-detail-item,
+#sb-current-root .sb-equity-large,
+#sb-current-root .sb-paused,
+#sb-current-root .sb-paused-item,
+#sb-current-root .sb-webhook {
+  background: var(--card);
+  border-color: var(--border);
+}
+#sb-current-root .sb-account-metric,
+#sb-current-root .sb-unit {
+  background: linear-gradient(145deg, var(--card), hsl(220 19% 11%));
+}
+#sb-current-root.sb-light .sb-account-metric,
+#sb-current-root.sb-light .sb-unit { background: var(--card); }
+
+#sb-current-root .sb-topline,
+#sb-current-root .sb-unit-head,
+#sb-current-root .sb-stat-rail,
+#sb-current-root .sb-expand,
+#sb-current-root .sb-detail-actions,
+#sb-current-root .sb-paused-content,
+#sb-current-root .sb-webhook-content {
+  border-color: var(--border);
+}
+#sb-current-root .sb-brand-copy p,
+#sb-current-root .sb-section-title i,
+#sb-current-root .sb-account-accent strong,
+#sb-current-root .sb-tiny-stat.sb-emphasis strong,
+#sb-current-root .sb-unit h3 b,
+#sb-current-root .sb-expand:hover,
+#sb-current-root .sb-pause-button:hover,
+#sb-current-root .sb-endpoint,
+#sb-current-root .sb-webhook-content code {
+  color: var(--primary);
+}
+#sb-current-root .sb-mark {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+#sb-current-root .sb-mark::after { background: var(--primary); }
+#sb-current-root .sb-mark::after { box-shadow: 0 0 0 3px var(--background); }
+#sb-current-root .sb-btn-primary {
+  color: var(--primary) !important;
+  border-color: hsl(158 36% 35%);
+  background: var(--primary-soft);
+}
+#sb-current-root .sb-btn-danger,
+#sb-current-root .sb-detail-actions .sb-danger-action {
+  color: var(--destructive) !important;
+  border-color: hsl(4 38% 38%);
+  background: hsl(4 30% 14%);
+}
+#sb-current-root.sb-light .sb-btn-danger,
+#sb-current-root.sb-light .sb-detail-actions .sb-danger-action {
+  background: hsl(4 55% 96%);
+  border-color: hsl(4 42% 82%);
+}
+#sb-current-root .sb-btn:hover,
+#sb-current-root .sb-detail-actions button:hover {
+  background: var(--muted-surface);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+#sb-current-root .sb-btn-primary:hover,
+#sb-current-root .sb-webhook-content button:hover,
+#sb-current-root .sb-paused-item button:hover {
+  background: var(--primary-soft);
+}
+#sb-current-root .sb-menu {
+  color: var(--foreground);
+  background: var(--popover);
+  border-color: var(--border);
+  box-shadow: 0 18px 45px hsl(220 30% 4% / .28);
+}
+#sb-current-root .sb-menu p,
+#sb-current-root .sb-account-metric small,
+#sb-current-root .sb-net-caption,
+#sb-current-root .sb-breakeven,
+#sb-current-root .sb-footnote,
+#sb-current-root .sb-live-state,
+#sb-current-root .sb-method,
+#sb-current-root .sb-webhook-content p { color: var(--muted-foreground); }
+#sb-current-root .sb-switch { background: var(--muted-foreground); }
+#sb-current-root .sb-switch i { background: var(--foreground); }
+#sb-current-root .sb-switch[aria-checked="true"] { background: var(--primary); }
+#sb-current-root .sb-intervals button:hover,
+#sb-current-root .sb-expand:hover { background: var(--muted-surface); }
+#sb-current-root .sb-intervals button svg { color: var(--primary); }
+
+#sb-current-root .sb-sample-ribbon,
+#sb-current-root .sb-notice {
+  color: var(--foreground);
+  background: hsl(158 35% 15%);
+  border-color: hsl(158 30% 30%);
+}
+#sb-current-root.sb-light .sb-sample-ribbon,
+#sb-current-root.sb-light .sb-notice {
+  background: hsl(158 38% 92%);
+  border-color: hsl(158 32% 78%);
+}
+#sb-current-root .sb-sample-label,
+#sb-current-root .sb-live-state b,
+#sb-current-root .sb-live-state i { color: var(--primary); }
+#sb-current-root .sb-live-state i { background: var(--primary); }
+#sb-current-root .sb-hero h2,
+#sb-current-root .sb-brand-copy h1,
+#sb-current-root .sb-board-heading h2,
+#sb-current-root .sb-unit h3,
+#sb-current-root .sb-equity-title h4 {
+  font-family: 'Manrope', sans-serif;
+}
+#sb-current-root .sb-net-copy > strong.is-positive { color: var(--sb-profit-text); }
+#sb-current-root .sb-net-copy > strong.is-negative { color: var(--sb-loss-text); }
+#sb-current-root .sb-status { color: var(--sb-profit-text); }
+#sb-current-root .sb-status.is-paused,
+#sb-current-root .sb-paused-title b,
+#sb-current-root .sb-unit-paused .sb-pause-button { color: var(--warning); }
+#sb-current-root .sb-unit::before { background: var(--primary); }
+#sb-current-root .sb-unit-paused::before { background: var(--warning); }
+#sb-current-root .sb-equity { color: var(--muted-foreground); }
+#sb-current-root .sb-equity-large,
+#sb-current-root .sb-detail-item,
+#sb-current-root .sb-stat-rail { background: var(--card); }
+#sb-current-root .sb-equity-large { border-color: var(--border); }
+#sb-current-root .sb-equity-large svg line { stroke: var(--muted-foreground); }
+#sb-current-root .sb-detail-item span,
+#sb-current-root .sb-chart-foot { color: var(--muted-foreground); }
+#sb-current-root .sb-close-count { border-color: var(--border); }
+#sb-current-root .sb-tiny-stat { border-color: var(--border); background: transparent; }
+#sb-current-root .sb-tiny-stat span,
+#sb-current-root .sb-section-note,
+#sb-current-root .sb-hero p,
+#sb-current-root .sb-last-sync,
+#sb-current-root .sb-kicker,
+#sb-current-root .sb-overline,
+#sb-current-root .sb-unit-index,
+#sb-current-root .sb-symbols span,
+#sb-current-root .sb-symbols .sb-no-symbols,
+#sb-current-root .sb-detail-item span,
+#sb-current-root .sb-currency { color: var(--muted-foreground); }
+#sb-current-root .sb-symbols span { border-color: var(--border); }
+#sb-current-root .sb-reorder button,
+#sb-current-root .sb-detail-actions button {
+  color: var(--foreground);
+  border-color: var(--border);
+  background: var(--muted-surface);
+}
+#sb-current-root .sb-drag-handle,
+#sb-current-root .sb-unit-tools { color: var(--muted-foreground); }
+#sb-current-root .sb-stat-rail { background: var(--card); }
+#sb-current-root .sb-expand { color: var(--foreground); }
+#sb-current-root .sb-detail-item { background: var(--muted-surface); }
+#sb-current-root .sb-pause-button { color: var(--foreground); }
+#sb-current-root .sb-paused-title b { border-color: hsl(40 44% 40%); }
+#sb-current-root .sb-paused summary p,
+#sb-current-root .sb-webhook-title small { color: var(--muted-foreground); }
+#sb-current-root .sb-paused-item { background: var(--muted-surface); }
+#sb-current-root .sb-paused-item button,
+#sb-current-root .sb-webhook-content button {
+  color: var(--primary);
+  border: 1px solid hsl(158 36% 35%);
+  background: var(--primary-soft);
+}
+#sb-current-root .sb-endpoint { border-color: var(--border); }
+#sb-current-root .sb-webhook-content code { color: var(--primary); }
+#sb-current-root .sb-account-metric strong,
+#sb-current-root .sb-tiny-stat strong,
+#sb-current-root .sb-detail-item strong,
+#sb-current-root .sb-paused-number,
+#sb-current-root .sb-unit h3 b {
+  font-family: 'DM Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 680px) {
+  #sb-current-root.strategy-board { padding: 14px 12px 32px; }
+  #sb-current-root .sb-topline { align-items: flex-start; }
+  #sb-current-root .sb-sample-ribbon { align-items: flex-start; }
+  #sb-current-root .sb-account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #sb-current-root .sb-units { grid-template-columns: minmax(0, 1fr); }
+  #sb-current-root .sb-main-signal { grid-template-columns: minmax(0, 1fr) minmax(72px, .72fr) auto; }
+  #sb-current-root .sb-net-copy > strong { font-size: clamp(18px, 6vw, 23px); }
+  #sb-current-root .sb-method { gap: 6px 12px; }
+  #sb-current-root .sb-webhook-content { grid-template-columns: 1fr; }
+  #sb-current-root .sb-webhook-content button { justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #sb-current-root *,
+  #sb-current-root *::before,
+  #sb-current-root *::after {
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}
