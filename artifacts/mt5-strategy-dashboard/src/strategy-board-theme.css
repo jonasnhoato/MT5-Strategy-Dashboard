@@ -323,4 +323,5 @@
   #sb-current-root .sb-actions > div { flex:0 0 auto; }
   #sb-current-root .sb-actions .sb-btn { flex-shrink:0; }
 }
+#sb-current-root .sb-symbols span:not(.sb-no-symbols) { font-size:17px; }
 @media print { #sb-current-root { --board-background:white;--board-foreground:#18212b;--board-card:white;--board-border:#d1d5db;--board-ink:white;--board-text:#18212b;--board-muted-foreground:#657482;--board-muted:#657482;--board-primary:#087c59;--sb-profit-text:#087c59;--sb-loss-text:#ba3547; } #sb-current-root .sb-unit,#sb-current-root .sb-account-metric,#sb-current-root .sb-method { background:white!important; } }
