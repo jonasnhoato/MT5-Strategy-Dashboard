@@ -1,1 +1,2 @@
 - [MT5 magic-number tracking](mt5-magic-number-tracking.md) — preserve global pause semantics and serialize ingestion with pause/delete operations.
+- [Approved visual direction](mt5-visual-direction.md) — user approved Strategy board with the original colors and fonts; new explorations still require approval to apply.

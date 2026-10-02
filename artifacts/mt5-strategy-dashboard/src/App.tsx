@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { StrategyBoardTile } from '@/components/strategy-board-tile';
+import './strategy-board-theme.css';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -13,16 +15,14 @@ import {
   usePauseMagicNumber, useResumeMagicNumber,
 } from '@workspace/api-client-react';
 import type { StrategyPerformance } from '@workspace/api-client-react';
-import { CSVLink } from 'react-csv';
 import {
   Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip,
   XAxis, YAxis,
 } from 'recharts';
 import {
   Activity, AlertCircle, ArrowDownRight, ArrowUpRight, BarChart3, Check,
-  ChevronDown, ChevronUp, CircleHelp, Clock3, Download, ExternalLink,
-  GripVertical, Moon, Printer, RefreshCw, Sun, Trash2, TrendingUp,
-  WalletCards, X,
+  ChevronDown, CircleHelp, Clock3, Copy, ExternalLink,
+  Moon, Printer, RefreshCw, ShieldAlert, Sun, Trash2, TrendingUp, X,
 } from 'lucide-react';
 import {
   Route,
@@ -80,12 +80,6 @@ function readSavedStrategyOrder() {
   }
 }
 
-const equityCsvHeaders = [
-  { label: 'close_time', key: 'closeTime' },
-  { label: 'trade_net_profit', key: 'netProfit' },
-  { label: 'cumulative_net_profit', key: 'cumulativeProfit' },
-];
-
 function pfLabel(
   value: number | null,
   strategy?: Pick<StrategyPerformance, 'losses' | 'netProfit'>,
@@ -98,15 +92,15 @@ function pfLabel(
 function MetricTile({ label, value, detail, tone = 'neutral', icon }: {
   label: string; value: string; detail?: string; tone?: 'positive' | 'negative' | 'neutral'; icon: ReactNode;
 }) {
-  return <div className="panel min-w-0 rounded-xl p-4 md:p-[18px]">
-    <div className="flex items-center justify-between gap-2">
-      <span className="metric-label">{label}</span>
-      <span className="text-muted-foreground">{icon}</span>
+  return <div className={`sb-account-metric ${tone === 'positive' ? 'sb-account-accent' : ''}`}>
+    <div className="sb-metric-top">
+      <span>{label}</span>
+      <i>{icon}</i>
     </div>
-    <div className={`mono mt-3 truncate text-[23px] font-medium tracking-[-.045em] md:text-[26px] ${tone === 'positive' ? 'text-emerald-300' : tone === 'negative' ? 'text-rose-300' : 'text-foreground'}`} data-testid={`metric-${label.toLowerCase().replaceAll(' ', '-')}`}>
+    <strong className={tone === 'negative' ? 'is-negative' : ''} data-testid={`metric-${label.toLowerCase().replaceAll(' ', '-')}`}>
       {value}
-    </div>
-    {detail && <div className="mt-1.5 truncate text-[11px] text-muted-foreground">{detail}</div>}
+    </strong>
+    {detail && <small>{detail}</small>}
   </div>;
 }
 
@@ -145,184 +139,6 @@ function EquityChart({ strategy, light }: { strategy: StrategyPerformance; light
       </ResponsiveContainer>
     )}
   </div>;
-}
-
-function StrategyPanel({
-  strategy,
-  light,
-  onPause,
-  pausePending,
-  orderIndex,
-  strategyCount,
-  onMove,
-  onReorder,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  isDragging,
-  isDropTarget,
-}: {
-  strategy: StrategyPerformance;
-  light: boolean;
-  onPause: (strategy: StrategyPerformance) => void;
-  pausePending: boolean;
-  orderIndex: number;
-  strategyCount: number;
-  onMove: (direction: -1 | 1) => void;
-  onReorder: (source: number, target: number) => void;
-  onDragStart: (magicNumber: number) => void;
-  onDragEnd: () => void;
-  onDragOver: (magicNumber: number) => void;
-  isDragging: boolean;
-  isDropTarget: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const positive = strategy.netProfit >= 0;
-  const symbols = strategy.symbols ?? [];
-  const summaryStats = [
-    { label: 'Net profit', value: money(strategy.netProfit), tone: positive ? 'positive' : 'negative' },
-    { label: 'Closed trades', value: strategy.tradeCount.toLocaleString(), tone: 'neutral' },
-    { label: 'Win rate', value: percent(strategy.winRate), tone: 'neutral' },
-    { label: 'Profit factor', value: pfLabel(strategy.profitFactor, strategy), tone: 'neutral' },
-  ] as const;
-  const detailStats = [
-    ['Max drawdown', money(strategy.maxDrawdown)],
-    ['Avg net / trade', money(strategy.tradeCount > 0 ? strategy.netProfit / strategy.tradeCount : 0)],
-    ['Sharpe ratio', metric(strategy.sharpeRatio)],
-    ['Payout ratio', strategy.payoutRatio == null ? '—' : `${metric(strategy.payoutRatio)}×`],
-    ['Wins / losses', `${strategy.wins} / ${strategy.losses}`],
-  ];
-  const detailsId = `strategy-details-${strategy.magicNumber}`;
-
-  return <section
-    className={`panel overflow-hidden rounded-2xl transition-shadow ${expanded ? 'sm:col-span-2 xl:col-span-3' : ''} ${isDropTarget ? 'ring-2 ring-primary/60' : ''} ${isDragging ? 'opacity-60' : ''}`}
-    data-testid={`strategy-${strategy.magicNumber}`}
-    onDragOver={(event) => {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      if (!isDropTarget) onDragOver(strategy.magicNumber);
-    }}
-    onDrop={(event) => {
-      event.preventDefault();
-      const sourceValue = event.dataTransfer.getData('text/plain');
-      const source = Number(sourceValue);
-      if (sourceValue && Number.isSafeInteger(source) && source !== strategy.magicNumber) {
-        onReorder(source, strategy.magicNumber);
-      }
-      onDragEnd();
-    }}
-  >
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/80 px-4 py-3.5">
-      <div className="flex min-w-0 items-start gap-2.5">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary"><Activity size={16}/></div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="font-display text-[14px] font-semibold tracking-[-.03em]">Magic <span className="mono text-primary">{strategy.magicNumber}</span></h3>
-            {symbols.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1" aria-label={`Assets traded by magic number ${strategy.magicNumber}`}>
-                {symbols.map((symbol) => (
-                  <span key={symbol} title={`Traded asset: ${symbol}`} className="inline-flex items-center rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wide text-primary">{symbol}</span>
-                ))}
-              </div>
-            ) : (
-              <span className="rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">No ticker data</span>
-            )}
-          </div>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">Expert Advisor · {strategy.breakeven} breakeven</p>
-        </div>
-      </div>
-      <div className="print-hidden flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          draggable
-          onDragStart={(event) => {
-            event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', String(strategy.magicNumber));
-            onDragStart(strategy.magicNumber);
-          }}
-          onDragEnd={onDragEnd}
-          className="inline-flex h-8 w-8 cursor-grab items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground transition hover:border-primary/40 hover:text-foreground active:cursor-grabbing"
-          aria-label={`Drag magic number ${strategy.magicNumber} to reorder`}
-          title="Drag to reorder"
-          data-testid={`button-drag-strategy-${strategy.magicNumber}`}
-        ><GripVertical size={15}/></button>
-        <div className="flex flex-col">
-          <button
-            type="button"
-            onClick={() => onMove(-1)}
-            disabled={orderIndex === 0}
-            className="flex h-4 w-6 items-center justify-center rounded-t border border-border bg-muted/40 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
-            aria-label={`Move magic number ${strategy.magicNumber} up`}
-            data-testid={`button-move-strategy-up-${strategy.magicNumber}`}
-          ><ChevronUp size={12}/></button>
-          <button
-            type="button"
-            onClick={() => onMove(1)}
-            disabled={orderIndex === strategyCount - 1}
-            className="-mt-px flex h-4 w-6 items-center justify-center rounded-b border border-border bg-muted/40 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
-            aria-label={`Move magic number ${strategy.magicNumber} down`}
-            data-testid={`button-move-strategy-down-${strategy.magicNumber}`}
-          ><ChevronDown size={12}/></button>
-        </div>
-        <button
-          type="button"
-          onClick={() => onPause(strategy)}
-          disabled={pausePending}
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/[.07] px-2 text-[10px] font-medium text-rose-300 transition hover:border-rose-500/50 hover:bg-rose-500/[.12] disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`Stop monitoring and delete history for magic number ${strategy.magicNumber}`}
-          title="Stop monitoring and delete this strategy's history"
-          data-testid={`button-delete-strategy-${strategy.magicNumber}`}
-        ><Trash2 size={12}/><span>Delete</span></button>
-        {strategy.equity.length > 0 && <CSVLink
-          data={strategy.equity}
-          headers={equityCsvHeaders}
-          filename={`magic-${strategy.magicNumber}-net-profit-equity.csv`}
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-muted/50 px-2 text-[10px] text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
-          aria-label={`Export magic number ${strategy.magicNumber} equity as CSV`}
-          data-testid={`export-csv-${strategy.magicNumber}`}
-        ><Download size={12}/><span>CSV</span></CSVLink>}
-      </div>
-    </div>
-    <div className="grid grid-cols-2 gap-px bg-border/60">
-      {summaryStats.map(({ label, value, tone }) => <div key={label} className="min-w-0 bg-card/95 px-3 py-2.5">
-        <div className="metric-label !text-[9px]">{label}</div>
-        <div className={`mono mt-1 truncate text-[13px] font-medium ${tone === 'positive' ? 'text-emerald-300' : tone === 'negative' ? 'text-rose-300' : 'text-foreground'}`}>{value}</div>
-      </div>)}
-    </div>
-    <div className="px-3 pb-3 pt-2.5">
-      <button
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/80 bg-muted/35 px-3 py-2 text-left text-[11px] font-medium transition hover:border-primary/40 hover:bg-muted/60"
-        aria-expanded={expanded}
-        aria-controls={detailsId}
-        data-testid={`button-toggle-details-${strategy.magicNumber}`}
-      >
-        <span>{expanded ? 'Hide full details' : 'View full details'}</span>
-        <ChevronDown size={14} className={`text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}/>
-      </button>
-      <div id={detailsId} hidden={!expanded} className={`mt-3 border-t border-border/70 pt-3 ${expanded ? '' : 'hidden'}`}>
-        {expanded && <>
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border/70 bg-border/60 sm:grid-cols-3 xl:grid-cols-5">
-          {detailStats.map(([label, value]) => <div key={label} className="min-w-0 bg-card/95 px-3 py-2.5">
-            <div className="metric-label !text-[9px]">{label}</div>
-            <div className="mono mt-1.5 truncate text-[12px] font-medium text-foreground">{value}</div>
-          </div>)}
-        </div>
-        <div className="pt-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[12px] font-medium">Cumulative net profit</div>
-              <div className="mt-0.5 text-[10px] text-muted-foreground">Closed trades over time · account currency in USD</div>
-            </div>
-            <span className="mono text-[10px] text-muted-foreground">{strategy.equity.length} points</span>
-          </div>
-          <EquityChart strategy={strategy} light={light}/>
-        </div>
-        </>}
-      </div>
-    </div>
-  </section>;
 }
 
 function Home() {
@@ -444,35 +260,30 @@ function Home() {
     setStrategyOrder(order);
   };
 
-  return <main className="dashboard-shell min-h-[100dvh] bg-background">
-    <div className="mx-auto max-w-[1480px] px-4 pb-12 pt-4 sm:px-6 sm:pt-6 lg:px-9">
-      <header className="fade-up mb-7 flex flex-wrap items-center justify-between gap-5 border-b border-border/70 pb-5">
-        <div className="flex items-center gap-3.5">
-          <div className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
+  return <main id="sb-current-root" className={`dashboard-shell strategy-board ${light ? 'sb-light' : ''}`} data-testid="strategy-board">
+    <div className="sb-wrap">
+      <header className="sb-topline fade-up">
+        <div className="sb-brand">
+          <div className="sb-mark">
             <Activity size={21} strokeWidth={1.8}/>
-            <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-400"/>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-primary">Terminal / analytics</p>
-              <span className="rounded border border-border/80 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-muted-foreground">MT5</span>
-            </div>
-            <h1 className="mt-0.5 font-display text-[22px] font-bold tracking-[-.055em] md:text-[26px]">Strategy performance</h1>
+          <div className="sb-brand-copy">
+            <p>MT5 / ANALYTICS</p>
+            <h1>Strategy board <small>Terminal JFN</small></h1>
           </div>
         </div>
-        <div className="print-hidden flex flex-wrap items-center gap-2">
+        <div className="sb-actions print-hidden">
           <div ref={menuRef} className="relative">
-            <div className="flex h-9 overflow-hidden rounded-lg border border-border bg-card">
-              <button type="button" onClick={() => query.refetch()} disabled={loading} className="flex items-center gap-2 px-3 text-[12px] font-medium transition hover:bg-muted disabled:opacity-50" data-testid="button-refresh">
+            <div className="flex gap-[7px]">
+              <button type="button" onClick={() => query.refetch()} disabled={loading} className="sb-btn sb-btn-primary" data-testid="button-refresh">
                 <RefreshCw size={14} className={query.isFetching ? 'animate-spin text-primary' : ''}/> Refresh
               </button>
-              <div className="my-2 w-px bg-border"/>
-              <button type="button" onClick={() => setMenuOpen((open) => !open)} className="flex items-center gap-1.5 px-2.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Dashboard settings" aria-expanded={menuOpen} data-testid="button-dashboard-settings">
+              <button type="button" onClick={() => setMenuOpen((open) => !open)} className="sb-btn sb-icon-btn" aria-label="Dashboard settings" aria-expanded={menuOpen} data-testid="button-dashboard-settings">
                 {autoRefresh ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/> : null}
                 <ChevronDown size={14}/>
               </button>
             </div>
-            {menuOpen && <div className="absolute right-0 top-11 z-20 w-60 rounded-xl border border-border bg-popover p-3 shadow-xl">
+            {menuOpen && <div className="sb-menu rounded-xl">
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <div><div className="text-xs font-semibold">Auto-refresh</div><div className="mt-0.5 text-[10px] text-muted-foreground">Off by default</div></div>
                 <button type="button" role="switch" aria-checked={autoRefresh} onClick={() => setAutoRefresh((value) => !value)} className={`relative h-5 w-9 rounded-full transition ${autoRefresh ? 'bg-primary' : 'bg-muted'}`} data-testid="toggle-auto-refresh">
@@ -492,14 +303,18 @@ function Home() {
             setClearTradeError(null);
             setMenuOpen(false);
             setClearDialogOpen(true);
-          }} className="flex h-9 items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/[.07] px-3 text-[12px] font-medium text-rose-300 transition hover:border-rose-500/50 hover:bg-rose-500/[.12] disabled:cursor-not-allowed disabled:opacity-50" aria-label="Clear all trades" data-testid="button-clear-all-trades">
-            <Trash2 size={14}/><span>Clear all trades</span>
+          }} className="sb-btn sb-btn-danger" aria-label="Clear all trades" data-testid="button-clear-all-trades">
+            <Trash2 size={14}/><span>Clear trades</span>
           </button>
-          <button type="button" onClick={() => window.print()} className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[12px] text-muted-foreground transition hover:text-foreground" aria-label="Export dashboard as PDF" data-testid="button-export-pdf"><Printer size={14}/><span className="hidden sm:inline">PDF</span></button>
-          <button type="button" onClick={() => setLight((value) => !value)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:text-foreground" aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'} data-testid="button-toggle-theme">{light ? <Moon size={15}/> : <Sun size={15}/>}</button>
+          <button type="button" onClick={() => window.print()} className="sb-btn sb-icon-btn" aria-label="Export dashboard as PDF" title="Export dashboard as PDF" data-testid="button-export-pdf"><Printer size={14}/></button>
+          <button type="button" onClick={() => setLight((value) => !value)} className="sb-btn sb-icon-btn" aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'} data-testid="button-toggle-theme">{light ? <Moon size={15}/> : <Sun size={15}/>}</button>
         </div>
       </header>
-      {trackingNotice && <div role="status" className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/[.07] px-3 py-2 text-xs text-foreground" data-testid="status-strategy-tracking">
+      <div className="sb-sample-ribbon">
+        <p><span className="sb-sample-label">{query.isError ? 'CONNECTION ERROR' : hasData ? 'LIVE DATA' : 'MT5 CONNECTION'}</span> <span className="ml-2">{hasData ? 'Realized results from closed trades · no sample metrics' : loading ? 'Loading your trade history…' : 'Waiting for closed-trade history'}</span></p>
+        <div className="sb-live-state"><i/><b>{orderedStrategies.length} ACTIVE</b><span>/</span><span>{pausedMagicNumbers.length} PAUSED</span><span>/</span><span>{data?.totals.tradeCount ?? 0} closes</span></div>
+      </div>
+      {trackingNotice && <div role="status" className="sb-notice" data-testid="status-strategy-tracking">
         <span>{trackingNotice}</span>
         <button type="button" onClick={() => setTrackingNotice(null)} className="shrink-0 rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Dismiss strategy status"><X size={14}/></button>
       </div>}
@@ -576,12 +391,13 @@ function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="fade-up mb-5 flex flex-wrap items-center justify-between gap-2">
+      <div className="sb-hero fade-up">
         <div>
-          <p className="text-[12px] text-muted-foreground">An exact read on every Expert Advisor, grouped by magic number.</p>
-          <p className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground"><Clock3 size={12}/> Last updated {updatedAt}{autoRefresh && <span className="ml-1 inline-flex items-center gap-1 text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary"/> Auto · {INTERVALS.find((item) => item.ms === intervalMs)?.label}</span>}</p>
+          <span className="sb-kicker">ACCOUNT OVERVIEW / REALIZED PERFORMANCE</span>
+          <h2>Every magic number.<br/>A clear read.</h2>
+          <p>Exact closed-trade results, grouped by Expert Advisor identifier.</p>
         </div>
-        {hasData && <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-2.5 py-1 text-[10px] font-medium text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/> Data connected</div>}
+        <div className="sb-last-sync"><span>LAST UPDATED</span><strong className="inline-flex items-center gap-1"><Clock3 size={12}/>{updatedAt}</strong>{autoRefresh && <span className="mt-1 block text-primary">Auto · {INTERVALS.find((item) => item.ms === intervalMs)?.label}</span>}</div>
       </div>
 
       {query.isError && <div className="panel mb-5 flex flex-col gap-4 rounded-xl border-rose-500/25 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -592,12 +408,12 @@ function Home() {
         <button type="button" onClick={() => query.refetch()} className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:opacity-90" data-testid="button-retry"><RefreshCw size={14}/> Try again</button>
       </div>}
 
-      <section aria-label="Account-wide performance summary" className="fade-up-delay">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2"><WalletCards size={14} className="text-primary"/><h2 className="text-[12px] font-semibold tracking-wide">ACCOUNT SUMMARY</h2></div>
-          <span className="text-[10px] text-muted-foreground">All strategies · all closed trades</span>
+      <section aria-label="Account-wide performance summary" className="sb-overview fade-up-delay">
+        <div className="sb-section-heading">
+          <div className="sb-section-title"><i>01</i><h3>ACCOUNT PERFORMANCE</h3></div>
+          <span className="sb-section-note">All strategies · all closed trades</span>
         </div>
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="sb-account-grid">
           {[
             { label: 'Net profit', value: hasData ? money(data.totals.netProfit) : '—', detail: 'profit + commission + swap', icon: data && data.totals.netProfit < 0 ? <ArrowDownRight size={14}/> : <ArrowUpRight size={14}/>, tone: hasData ? data!.totals.netProfit >= 0 ? 'positive' as const : 'negative' as const : 'neutral' as const },
             { label: 'Avg net / trade', value: hasData ? money(data.totals.tradeCount > 0 ? data.totals.netProfit / data.totals.tradeCount : 0) : '—', detail: 'net profit ÷ closed trades', icon: <TrendingUp size={14}/>, tone: hasData ? data!.totals.netProfit >= 0 ? 'positive' as const : 'negative' as const : 'neutral' as const },
@@ -608,7 +424,7 @@ function Home() {
             { label: 'Closed trades', value: hasData ? data.totals.tradeCount.toLocaleString() : '—', detail: hasData ? `${data.totals.wins} wins · ${data.totals.losses} losses` : 'No trades received', icon: <Clock3 size={14}/> },
           ].map((item) => <MetricTile key={item.label} {...item}/>)}
         </div>
-        {hasData && <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border border-border/70 bg-card/50 px-3 py-2 text-[10px] text-muted-foreground">
+        {hasData && <div className="sb-method">
           <span className="inline-flex items-center gap-1.5"><CircleHelp size={12} className="text-primary"/> Net profit is realized profit + commission + swap.</span>
           <span>Per-trade P&amp;L Sharpe: mean ÷ standard deviation; not annualized.</span>
           <span>Account Sharpe <b className="mono text-foreground">{metric(data.totals.sharpeRatio)}</b></span>
@@ -616,49 +432,10 @@ function Home() {
         </div>}
       </section>
 
-      <div className="mb-3 mt-8 flex flex-wrap items-end justify-between gap-2">
-        <div><div className="flex items-center gap-2"><BarChart3 size={15} className="text-primary"/><h2 className="text-[13px] font-semibold tracking-wide">STRATEGY BREAKDOWN</h2></div><p className="mt-1 text-[10px] text-muted-foreground">Drag cards to reorder · order saved in this browser.</p></div>
-        {hasData && <span className="mono text-[10px] text-muted-foreground">{orderedStrategies.length} {orderedStrategies.length === 1 ? 'strategy' : 'strategies'}</span>}
+      <div className="sb-board-heading">
+        <div><h2>Strategy units</h2><p>One operating record per magic number · drag or use arrows to reorder · order saved in this browser.</p></div>
+        {hasData && <span className="sb-order-chip mono">{orderedStrategies.length} UNITS / DRAG TO MOVE</span>}
       </div>
-      {pausedMagicNumbers.length > 0 && <details
-        open={pausedStrategiesOpen}
-        onToggle={(event) => setPausedStrategiesOpen(event.currentTarget.open)}
-        className="panel mb-4 overflow-hidden rounded-xl"
-        aria-label="Paused strategies"
-        data-testid="panel-paused-strategies"
-      >
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 sm:p-5" data-testid="toggle-paused-strategies">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2"><h3 className="text-sm font-semibold">Paused strategies</h3><span className="mono rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] text-muted-foreground">{pausedMagicNumbers.length}</span></div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Re-enable magic numbers to accept future MT5 uploads.</p>
-          </div>
-          <ChevronDown size={16} className={`shrink-0 text-muted-foreground transition-transform ${pausedStrategiesOpen ? 'rotate-180' : ''}`}/>
-        </summary>
-        <div className="border-t border-border/70 p-4 sm:px-5">
-          <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">New MT5 trades for these magic numbers are ignored. Re-enabling starts collecting new trades again; deleted history will not return.</p>
-          <div className="flex flex-wrap gap-2">
-            {pausedMagicNumbers.map((magicNumber) => {
-              const isResuming = resumeMagicNumberMutation.isPending
-                && resumeMagicNumberMutation.variables?.magicNumber === magicNumber;
-              return <div key={magicNumber} className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 py-1 pl-2.5 pr-1">
-                <span className="mono text-[11px] font-semibold">Magic #{magicNumber}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResumeError(null);
-                    resumeMagicNumberMutation.mutate({ magicNumber });
-                  }}
-                  disabled={resumeMagicNumberMutation.isPending || pauseMagicNumberMutation.isPending}
-                  className="inline-flex h-7 items-center rounded-md bg-primary/15 px-2 text-[10px] font-semibold text-primary transition hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={`Re-enable monitoring for magic number ${magicNumber}`}
-                  data-testid={`button-resume-strategy-${magicNumber}`}
-                >{isResuming ? 'Re-enabling…' : 'Re-enable'}</button>
-              </div>;
-            })}
-          </div>
-        </div>
-        {resumeError && <p role="alert" className="mt-3 text-xs text-destructive" data-testid="status-resume-strategy-error">{resumeError}</p>}
-      </details>}
       {loading && !data ? <div className="space-y-3" aria-label="Loading dashboard">
         {[0, 1].map((item) => <div key={item} className="panel animate-pulse rounded-2xl p-5">
           <div className="flex justify-between"><div className="h-5 w-44 rounded bg-muted"/><div className="h-6 w-24 rounded bg-muted"/></div>
@@ -666,18 +443,18 @@ function Home() {
           <div className="mt-5 h-48 rounded-lg bg-muted/60"/>
         </div>)}
       </div> : null}
-      {hasData && orderedStrategies.length > 0 && <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {orderedStrategies.map((strategy, index) => <StrategyPanel
+      {hasData && orderedStrategies.length > 0 && <div className="sb-units">
+        {orderedStrategies.map((strategy, index) => <StrategyBoardTile
           key={strategy.magicNumber}
           strategy={strategy}
-          light={light}
-          orderIndex={index}
-          strategyCount={orderedStrategies.length}
+          index={index}
+          count={orderedStrategies.length}
+          chart={<EquityChart strategy={strategy} light={light}/>}
           onMove={(direction) => {
             const target = orderedStrategies[index + direction];
             if (target) reorderStrategy(strategy.magicNumber, target.magicNumber);
           }}
-          onReorder={reorderStrategy}
+          onDropReorder={reorderStrategy}
           onDragStart={(magicNumber) => {
             setDraggedMagicNumber(magicNumber);
             setDropTargetMagicNumber(null);
@@ -689,9 +466,9 @@ function Home() {
           }}
           isDragging={draggedMagicNumber === strategy.magicNumber}
           isDropTarget={dropTargetMagicNumber === strategy.magicNumber && draggedMagicNumber !== strategy.magicNumber}
-          onPause={(selected) => {
+          onPause={() => {
             setStrategyActionError(null);
-            setStrategyToPause(selected);
+            setStrategyToPause(strategy);
           }}
           pausePending={pauseMagicNumberMutation.isPending || clearTradesMutation.isPending || resumeMagicNumberMutation.isPending}
         />)}
@@ -712,7 +489,7 @@ function Home() {
           </> : <>
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-[.17em] text-primary">No active strategy history</div>
             <h3 className="font-display text-[22px] font-bold tracking-[-.05em] sm:text-[27px]">All strategy history is paused.</h3>
-            <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-muted-foreground">Re-enable a magic number above to accept future MT5 trades. Its strategy card will return after a new trade is submitted; deleted history cannot be recovered.</p>
+            <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-muted-foreground">Re-enable a magic number below to accept future MT5 trades. Its strategy card will return after a new trade is submitted; deleted history cannot be recovered.</p>
           </>}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => query.refetch()} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90" data-testid="button-check-for-trades"><RefreshCw size={13}/> Check for trades</button>
@@ -721,39 +498,54 @@ function Home() {
         </div>
       </div>}
 
-      {hasData && <p className="mt-4 text-center text-[10px] text-muted-foreground">Net profit includes realized profit, commission and swap. Sharpe uses per-trade P&amp;L divided by its standard deviation and is not annualized.</p>}
-      <details id="webhook-setup" open={!hasData} className="panel mt-7 overflow-hidden rounded-xl" data-testid="webhook-setup">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3.5">
-          <span><span className="text-[12px] font-semibold">MT5 webhook setup</span><span className="ml-2 text-[10px] text-muted-foreground">Send closed-trade JSON to your dashboard</span></span>
-          <span className="inline-flex items-center gap-2">
-            <span className="mono rounded-md border border-border bg-background/80 px-2 py-1 text-[10px] text-primary">POST /api/trades</span>
-            <span aria-hidden="true" className="text-muted-foreground">⌄</span>
-          </span>
-        </summary>
-        <div className="grid gap-4 border-t border-border/70 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Webhook URL</p>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <code className="min-w-0 flex-1 break-all rounded-md border border-border bg-background/80 px-2.5 py-2 text-[11px] text-foreground">{webhookUrl}</code>
-              <button type="button" onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(webhookUrl);
-                  setUrlCopied(true);
-                  setCopyError(false);
-                  window.setTimeout(() => setUrlCopied(false), 1800);
-                } catch {
-                  setCopyError(true);
-                  setUrlCopied(false);
-                }
-              }} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background/80 px-3 text-[11px] text-muted-foreground hover:text-foreground" aria-label="Copy webhook URL" data-testid="button-copy-webhook-url">
-                {urlCopied ? <Check size={13}/> : <Download size={13}/>}
-                {urlCopied ? 'Copied' : copyError ? 'Copy failed' : 'Copy URL'}
-              </button>
-            </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">In MT5, allow the site origin above under Tools → Options → Expert Advisors → Allow WebRequest for listed URL. Send timestamps as ISO 8601 UTC.</p>
+      {pausedMagicNumbers.length > 0 && <details
+        open={pausedStrategiesOpen}
+        onToggle={(event) => setPausedStrategiesOpen(event.currentTarget.open)}
+        className="sb-paused"
+        aria-label="Paused strategies"
+        data-testid="panel-paused-strategies"
+      >
+        <summary data-testid="toggle-paused-strategies">
+          <div>
+            <div className="sb-paused-title"><ShieldAlert size={14} /> Paused magic numbers <b>{pausedMagicNumbers.length}</b></div>
+            <p>Re-enable to accept future MT5 uploads. Deleted history will not return.</p>
           </div>
+          <ChevronDown size={15}/>
+        </summary>
+        <div className="sb-paused-content">
+          {pausedMagicNumbers.map((magicNumber) => {
+            const isResuming = resumeMagicNumberMutation.isPending
+              && resumeMagicNumberMutation.variables?.magicNumber === magicNumber;
+            return <div key={magicNumber} className="sb-paused-item">
+              <span className="sb-paused-number">Magic #{magicNumber}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setResumeError(null);
+                  resumeMagicNumberMutation.mutate({ magicNumber });
+                }}
+                disabled={resumeMagicNumberMutation.isPending || pauseMagicNumberMutation.isPending}
+                aria-label={`Re-enable monitoring for magic number ${magicNumber}`}
+                data-testid={`button-resume-strategy-${magicNumber}`}
+              >{isResuming ? 'Re-enabling…' : 'Re-enable'}</button>
+            </div>;
+          })}
+        </div>
+        {resumeError && <p role="alert" className="mt-3 px-3 pb-2 text-xs text-destructive" data-testid="status-resume-strategy-error">{resumeError}</p>}
+      </details>}
+      {hasData && <p className="sb-footnote mt-4 text-center text-[10px] text-muted-foreground">Net profit includes realized profit, commission and swap. Sharpe uses per-trade P&amp;L divided by its standard deviation and is not annualized.</p>}
+      <details id="webhook-setup" open={!hasData} className="sb-webhook" data-testid="webhook-setup">
+        <summary>
+          <span className="sb-webhook-title">MT5 webhook setup<small>Send closed-trade JSON to your dashboard</small></span>
+          <span className="sb-endpoint">POST /api/trades</span>
+        </summary>
+        <div className="sb-webhook-content">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Example request body</p>
+            <p>Configure your MT5 Expert Advisor to post closed-trade records to the trade endpoint. Send timestamps as ISO 8601 UTC.</p>
+            <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider">Webhook URL</p>
+            <code className="mt-1.5 block break-all">{webhookUrl}</code>
+            <p className="mt-2 text-[10px]">In MT5, allow the site origin above under Tools → Options → Expert Advisors → Allow WebRequest for listed URL.</p>
+            <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider">Example request body</p>
             <pre className="mono mt-1.5 overflow-x-auto rounded-md border border-border bg-background/80 p-3 text-[10px] leading-relaxed text-foreground"><code>{`{
   "account_id": "mt5-main",
   "trades": [{
@@ -770,9 +562,23 @@ function Home() {
 }`}</code></pre>
             <p className="mt-1.5 text-[10px] text-muted-foreground">Net profit is profit + commission + swap. ticket is optional; ticket deduplication is scoped by account_id.</p>
           </div>
+          <button type="button" onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(webhookUrl);
+              setUrlCopied(true);
+              setCopyError(false);
+              window.setTimeout(() => setUrlCopied(false), 1800);
+            } catch {
+              setCopyError(true);
+              setUrlCopied(false);
+            }
+          }} aria-label="Copy webhook URL" data-testid="button-copy-webhook-url">
+            <Copy size={13}/>
+            {urlCopied ? 'Copied' : copyError ? 'Copy failed' : 'Copy URL'}
+          </button>
         </div>
       </details>
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4 text-[10px] text-muted-foreground">
+      <footer className="sb-footnote mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4">
         <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/> MT5 analytics workspace</span>
         <span>Precision over prediction.</span>
       </footer>
