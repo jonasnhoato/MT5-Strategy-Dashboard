@@ -66,8 +66,10 @@ const timestamp = (value?: number) => value
   ? new Date(value).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   : 'Waiting for first sync';
 
-const STRATEGY_ORDER_STORAGE_KEY = 'mt5-strategy-dashboard-order-v1';
 const isPreviewDemo = import.meta.env.DEV;
+const STRATEGY_ORDER_STORAGE_KEY = isPreviewDemo
+  ? 'mt5-strategy-dashboard-preview-order-v1'
+  : 'mt5-strategy-dashboard-order-v1';
 
 function readSavedStrategyOrder() {
   try {
@@ -163,10 +165,12 @@ function Home() {
   const menuRef = useRef<HTMLDivElement>(null);
   const query = useGetTradesDashboard({
     query: {
-      queryKey: getGetTradesDashboardQueryKey(),
+      queryKey: isPreviewDemo ? ['mt5-preview-demo-dashboard'] : getGetTradesDashboardQueryKey(),
+      enabled: !isPreviewDemo,
+      initialData: isPreviewDemo ? previewDemoDashboard : undefined,
       staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
-      refetchInterval: autoRefresh ? intervalMs : false,
+      refetchInterval: !isPreviewDemo && autoRefresh ? intervalMs : false,
     },
   });
   const clearTradesMutation = useClearTrades({
@@ -221,7 +225,7 @@ function Home() {
   const loading = query.isLoading || query.isFetching;
   const hasData = !!data && (data.totals.tradeCount > 0 || data.strategies.length > 0);
   const webhookUrl = `${window.location.origin}/api/trades`;
-  const updatedAt = timestamp(query.dataUpdatedAt);
+  const updatedAt = isPreviewDemo ? 'Demo data · not synced' : timestamp(query.dataUpdatedAt);
   useEffect(() => {
     document.documentElement.classList.toggle('light', light);
     document.documentElement.classList.toggle('dark', !light);
@@ -277,7 +281,7 @@ function Home() {
         <div className="sb-actions print-hidden">
           <div ref={menuRef} className="relative">
             <div className="flex gap-[7px]">
-              <button type="button" onClick={() => query.refetch()} disabled={loading} className="sb-btn sb-btn-primary" data-testid="button-refresh">
+              <button type="button" onClick={() => query.refetch()} disabled={loading || isPreviewDemo} className="sb-btn sb-btn-primary" data-testid="button-refresh">
                 <RefreshCw size={14} className={query.isFetching ? 'animate-spin text-primary' : ''}/> Refresh
               </button>
               <button type="button" onClick={() => setMenuOpen((open) => !open)} className="sb-btn sb-icon-btn" aria-label="Dashboard settings" aria-expanded={menuOpen} data-testid="button-dashboard-settings">
@@ -288,7 +292,7 @@ function Home() {
             {menuOpen && <div className="sb-menu rounded-xl">
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <div><div className="text-xs font-semibold">Auto-refresh</div><div className="mt-0.5 text-[10px] text-muted-foreground">Off by default</div></div>
-                <button type="button" role="switch" aria-checked={autoRefresh} onClick={() => setAutoRefresh((value) => !value)} className={`relative h-5 w-9 rounded-full transition ${autoRefresh ? 'bg-primary' : 'bg-muted'}`} data-testid="toggle-auto-refresh">
+                <button type="button" role="switch" aria-checked={autoRefresh} disabled={isPreviewDemo} onClick={() => setAutoRefresh((value) => !value)} className={`relative h-5 w-9 rounded-full transition ${autoRefresh ? 'bg-primary' : 'bg-muted'}`} data-testid="toggle-auto-refresh">
                   <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${autoRefresh ? 'translate-x-[18px]' : 'translate-x-0.5'}`}/>
                 </button>
               </div>
@@ -298,10 +302,11 @@ function Home() {
                   {option.label}{intervalMs === option.ms && <Check size={13} className="text-primary"/>}
                 </button>)}
               </div>
-              <div className="mt-2 border-t border-border pt-2 text-[10px] leading-relaxed text-muted-foreground">Automatic checks run no more often than every 5 minutes.</div>
+              <div className="mt-2 border-t border-border pt-2 text-[10px] leading-relaxed text-muted-foreground">{isPreviewDemo ? 'Refresh and trade controls are disabled in this local sample preview.' : 'Automatic checks run no more often than every 5 minutes.'}</div>
             </div>}
           </div>
-          <button type="button" disabled={pauseMagicNumberMutation.isPending} onClick={() => {
+          <button type="button" disabled={isPreviewDemo || pauseMagicNumberMutation.isPending} title={isPreviewDemo ? 'Disabled in the local sample preview' : undefined} onClick={() => {
+            if (isPreviewDemo) return;
             setClearTradeError(null);
             setMenuOpen(false);
             setClearDialogOpen(true);
@@ -313,7 +318,7 @@ function Home() {
         </div>
       </header>
       <div className="sb-sample-ribbon">
-        <p><span className="sb-sample-label">{query.isError ? 'CONNECTION ERROR' : hasData ? 'LIVE DATA' : 'MT5 CONNECTION'}</span> <span className="ml-2">{hasData ? 'Realized results from closed trades · no sample metrics' : loading ? 'Loading your trade history…' : 'Waiting for closed-trade history'}</span></p>
+        <p><span className="sb-sample-label">{isPreviewDemo ? 'PREVIEW · SAMPLE DATA' : query.isError ? 'CONNECTION ERROR' : hasData ? 'LIVE DATA' : 'MT5 CONNECTION'}</span> <span className="ml-2">{isPreviewDemo ? 'Illustrative trades only · nothing is sent to MT5 or saved' : hasData ? 'Realized results from closed trades · no sample metrics' : loading ? 'Loading your trade history…' : 'Waiting for closed-trade history'}</span></p>
         <div className="sb-live-state"><i/><b>{orderedStrategies.length} ACTIVE</b><span>/</span><span>{pausedMagicNumbers.length} PAUSED</span><span>/</span><span>{data?.totals.tradeCount ?? 0} closes</span></div>
       </div>
       {trackingNotice && <div role="status" className="sb-notice" data-testid="status-strategy-tracking">
@@ -340,9 +345,10 @@ function Home() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={clearTradesMutation.isPending} data-testid="button-cancel-clear-trades">Keep trades</AlertDialogCancel>
             <AlertDialogAction
-              disabled={clearTradesMutation.isPending}
+              disabled={isPreviewDemo || clearTradesMutation.isPending}
               onClick={(event) => {
                 event.preventDefault();
+                if (isPreviewDemo) return;
                 setClearTradeError(null);
                 clearTradesMutation.mutate(undefined);
               }}
@@ -376,10 +382,10 @@ function Home() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pauseMagicNumberMutation.isPending} data-testid="button-cancel-pause-strategy">Keep monitoring</AlertDialogCancel>
             <AlertDialogAction
-              disabled={pauseMagicNumberMutation.isPending || strategyToPause === null}
+              disabled={isPreviewDemo || pauseMagicNumberMutation.isPending || strategyToPause === null}
               onClick={(event) => {
                 event.preventDefault();
-                if (strategyToPause) {
+                if (!isPreviewDemo && strategyToPause) {
                   setStrategyActionError(null);
                   pauseMagicNumberMutation.mutate({ magicNumber: strategyToPause.magicNumber });
                 }
@@ -472,7 +478,7 @@ function Home() {
             setStrategyActionError(null);
             setStrategyToPause(strategy);
           }}
-          pausePending={pauseMagicNumberMutation.isPending || clearTradesMutation.isPending || resumeMagicNumberMutation.isPending}
+           pausePending={isPreviewDemo || pauseMagicNumberMutation.isPending || clearTradesMutation.isPending || resumeMagicNumberMutation.isPending}
         />)}
       </div>}
       {!loading && !query.isError && !hasData && <div className="panel fine-grid relative overflow-hidden rounded-2xl p-6 sm:p-9">
@@ -523,10 +529,11 @@ function Home() {
               <button
                 type="button"
                 onClick={() => {
+                  if (isPreviewDemo) return;
                   setResumeError(null);
                   resumeMagicNumberMutation.mutate({ magicNumber });
                 }}
-                disabled={resumeMagicNumberMutation.isPending || pauseMagicNumberMutation.isPending}
+                disabled={isPreviewDemo || resumeMagicNumberMutation.isPending || pauseMagicNumberMutation.isPending}
                 aria-label={`Re-enable monitoring for magic number ${magicNumber}`}
                 data-testid={`button-resume-strategy-${magicNumber}`}
               >{isResuming ? 'Re-enabling…' : 'Re-enable'}</button>
