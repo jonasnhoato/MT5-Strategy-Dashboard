@@ -275,7 +275,7 @@ export function StrategyBoard() {
       <header className="sb-topline">
         <div className="sb-brand">
           <div className="sb-mark"><Activity size={19} /></div>
-          <div className="sb-brand-copy"><p>MT5 / PRIVATE ANALYTICS</p><h1>Strategy board <small>TERMINAL 05</small></h1></div>
+          <div className="sb-brand-copy"><p>MT5 / PRIVATE ANALYTICS</p><h1>Strategy board <small>Terminal JFN</small></h1></div>
         </div>
         <div className="sb-actions">
           <button className="sb-btn sb-btn-primary" type="button" onClick={() => setNotice('Local sample fixture is shown; no refresh request was sent.')} data-testid="button-refresh"><RefreshCw size={13} /><span className="sb-btn-text">Refresh</span></button>
