@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+#mt5-dashboard-root {
+  color-scheme: dark;
+  --background: 220 21% 9%;
+  --foreground: 210 18% 91%;
+  --border: 218 15% 20%;
+  --input: 218 15% 22%;
+  --card: 220 19% 12%;
+  --card-foreground: 210 18% 91%;
+  --popover: 220 19% 13%;
+  --popover-foreground: 210 18% 91%;
+  --primary: 158 54% 52%;
+  --primary-foreground: 220 24% 10%;
+  --secondary: 218 16% 17%;
+  --secondary-foreground: 210 18% 88%;
+  --muted: 218 16% 16%;
+  --muted-foreground: 216 10% 59%;
+  --accent: 158 40% 17%;
+  --accent-foreground: 156 58% 72%;
+  --destructive: 4 65% 56%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 158 54% 52%;
+  --chart-1: 158 54% 52%;
+  --chart-2: 188 64% 57%;
+  --chart-3: 40 70% 63%;
+  --chart-4: 4 65% 60%;
+  --chart-5: 263 48% 68%;
+  --app-font-sans: 'DM Sans', sans-serif;
+  --app-font-mono: 'DM Mono', monospace;
+  --radius: 0.75rem;
+  min-height: 100dvh;
+  color: hsl(var(--foreground));
+  font-family: var(--app-font-sans);
+}
+
+#mt5-dashboard-root.light {
+  color-scheme: light;
+  --background: 198 22% 96%;
+  --foreground: 207 27% 15%;
+  --border: 202 16% 85%;
+  --input: 202 16% 82%;
+  --card: 0 0% 100%;
+  --card-foreground: 207 27% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 207 27% 15%;
+  --primary: 158 58% 35%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 198 18% 91%;
+  --secondary-foreground: 207 27% 19%;
+  --muted: 199 18% 92%;
+  --muted-foreground: 207 12% 43%;
+  --accent: 158 35% 89%;
+  --accent-foreground: 158 62% 25%;
+  --destructive: 4 63% 49%;
+}
+
+#mt5-dashboard-root .font-display { font-family: 'Manrope', sans-serif; }
+#mt5-dashboard-root .mono { font-family: var(--app-font-mono); font-variant-numeric: tabular-nums; }
+#mt5-dashboard-root .metric-label {
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  font-weight: 600;
+}
+#mt5-dashboard-root .panel {
+  background: linear-gradient(145deg, hsl(var(--card)), hsl(220 19% 11%));
+  border: 1px solid hsl(var(--border));
+}
+#mt5-dashboard-root.light .panel { background: hsl(var(--card)); }
+#mt5-dashboard-root .fine-grid {
+  background-image: linear-gradient(hsl(var(--border) / .22) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / .22) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+#mt5-dashboard-root .fade-up { animation: mt5-fade-up .45s ease-out both; }
+#mt5-dashboard-root .fade-up-delay { animation: mt5-fade-up .55s .08s ease-out both; }
+@keyframes mt5-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media print {
+  #mt5-dashboard-root { background: white !important; color: #18212b !important; }
+  #mt5-dashboard-root .panel { background: white !important; border: 1px solid #d8dee6 !important; break-inside: avoid; }
+  #mt5-dashboard-root .print-hidden { display: none !important; }
+  #mt5-dashboard-root .fine-grid { background-image: none !important; }
+  #mt5-dashboard-root.dashboard-shell { padding: 0 !important; background: white !important; }
+  #mt5-dashboard-root .recharts-responsive-container { display: flex !important; justify-content: center !important; break-inside: avoid; }
+}
