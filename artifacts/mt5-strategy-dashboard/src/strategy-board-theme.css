@@ -324,4 +324,36 @@
   #sb-current-root .sb-actions .sb-btn { flex-shrink:0; }
 }
 #sb-current-root .sb-symbols span:not(.sb-no-symbols) { font-size:17px; }
+#sb-current-root .sb-mark { border-radius:12px; }
+#sb-current-root .sb-btn,
+#sb-current-root .sb-menu,
+#sb-current-root .sb-detail-item,
+#sb-current-root .sb-paused-item,
+#sb-current-root .sb-webhook-content button { border-radius:10px; }
+#sb-current-root .sb-account-metric { border-radius:14px; }
+#sb-current-root .sb-sample-ribbon,
+#sb-current-root .sb-notice { border-radius:12px; }
+#sb-current-root .sb-unit,
+#sb-current-root .sb-paused,
+#sb-current-root .sb-webhook { border-radius:18px; }
+#sb-current-root .sb-unit::before { top:14px;bottom:14px;border-radius:999px; }
+#sb-current-root .sb-unit-head { border-radius:18px 18px 0 0; }
+#sb-current-root .sb-unit-foot { border-radius:0 0 18px 18px; }
+#sb-current-root .sb-symbols span,
+#sb-current-root .sb-order-chip,
+#sb-current-root .sb-paused-title b,
+#sb-current-root .sb-endpoint { border-radius:999px; }
+#sb-current-root .sb-symbols span { padding:3px 8px; }
+#sb-current-root .sb-reorder { gap:3px; }
+#sb-current-root .sb-reorder button { border-radius:5px;border:1px solid var(--board-border); }
+#sb-current-root .sb-method { border-radius:12px;margin-top:6px;border-top:1px solid var(--board-border); }
+#sb-current-root .sb-detail-actions a,
+#sb-current-root .sb-detail-actions button { border-radius:9px; }
+#sb-current-root .sb-font-controls { display:flex;align-items:center;gap:4px; }
+#sb-current-root .sb-btn { font-size:12px; }
+#sb-current-root .sb-font-scale { font-size:10px;min-width:32px;text-align:center;color:var(--board-muted-foreground); }
+#sb-current-root .sb-font-controls .sb-icon-btn { width:30px; }
+#sb-current-root .sb-actions { row-gap:8px; }
+#sb-current-root .sb-paused-content { border-radius:0 0 18px 18px; }
+#sb-current-root .sb-webhook-content { border-radius:0 0 18px 18px; }
 @media print { #sb-current-root { --board-background:white;--board-foreground:#18212b;--board-card:white;--board-border:#d1d5db;--board-ink:white;--board-text:#18212b;--board-muted-foreground:#657482;--board-muted:#657482;--board-primary:#087c59;--sb-profit-text:#087c59;--sb-loss-text:#ba3547; } #sb-current-root .sb-unit,#sb-current-root .sb-account-metric,#sb-current-root .sb-method { background:white!important; } }

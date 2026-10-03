@@ -14,3 +14,9 @@ The user approved reviewing the dashboard with clearly labeled fake trades in th
 **Why:** They requested sample trades to inspect the appearance and confirmed, "perfect, now is great."
 
 **How to apply:** Keep design-review samples separate from real MT5 history and published live metrics.
+
+**Rule:** Keep the dashboard dark permanently.
+
+**Why:** The user explicitly requested a permanent dark theme while replacing the theme toggle with font-size controls.
+
+**How to apply:** Do not reintroduce a light-theme toggle unless the user changes this requirement.

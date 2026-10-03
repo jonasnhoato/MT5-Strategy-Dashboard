@@ -73,7 +73,7 @@ function applySiteFontScale(scale: number) {
   while (walker.nextNode()) {
     const text = walker.currentNode;
     if (!text.textContent?.trim()) continue;
-    const owner = text.parentElement;
+    const owner = text.parentNode;
     if (owner instanceof HTMLElement || owner instanceof SVGElement) textElements.add(owner);
   }
 
@@ -87,14 +87,18 @@ function applySiteFontScale(scale: number) {
     const baseline = Number.parseFloat(getComputedStyle(element).fontSize);
     if (!Number.isFinite(baseline)) continue;
     fontBaselines.set(element, baseline);
-    element.style.setProperty('font-size', `${baseline * scale}px`, 'important');
     scaledFontElements.add(element);
+  }
+  for (const element of scaledFontElements) {
+    element.style.setProperty('font-size', `${fontBaselines.get(element)! * scale}px`, 'important');
   }
 }
 
 function readSavedFontScale() {
   try {
-    const saved = Number(window.localStorage.getItem(FONT_SCALE_STORAGE_KEY));
+    const value = window.localStorage.getItem(FONT_SCALE_STORAGE_KEY);
+    if (value === null) return 1;
+    const saved = Number(value);
     return Number.isFinite(saved)
       ? Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, saved))
       : 1;
@@ -231,13 +235,16 @@ function Home() {
   }, [fontScale]);
   useEffect(() => {
     let frame = 0;
-    const observer = new MutationObserver(() => {
+    const schedule = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => applySiteFontScale(fontScale));
-    });
+    };
+    const observer = new MutationObserver(schedule);
     observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', schedule);
     return () => {
       observer.disconnect();
+      window.removeEventListener('resize', schedule);
       window.cancelAnimationFrame(frame);
     };
   }, [fontScale]);
@@ -344,7 +351,7 @@ function Home() {
     setStrategyOrder(order);
   };
 
-  return <main id="sb-current-root" className={`dashboard-shell strategy-board ${light ? 'sb-light' : ''}`} data-testid="strategy-board">
+  return <main id="sb-current-root" className="dashboard-shell strategy-board" data-testid="strategy-board">
     <div className="sb-wrap">
       <header className="sb-topline fade-up">
         <div className="sb-brand">
@@ -391,8 +398,11 @@ function Home() {
           }} className="sb-btn sb-btn-danger" aria-label="Clear all trades" data-testid="button-clear-all-trades">
             <Trash2 size={14}/><span>Clear trades</span>
           </button>
-          <button type="button" onClick={() => window.print()} className="sb-btn sb-icon-btn" aria-label="Export dashboard as PDF" title="Export dashboard as PDF" data-testid="button-export-pdf"><Printer size={14}/></button>
-          <button type="button" onClick={() => setLight((value) => !value)} className="sb-btn sb-icon-btn" aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'} data-testid="button-toggle-theme">{light ? <Moon size={15}/> : <Sun size={15}/>}</button>
+          <div className="sb-font-controls" role="group" aria-label="Site font size">
+            <button type="button" className="sb-btn sb-icon-btn" aria-label="Decrease site font size" title="Decrease font size" disabled={fontScale <= MIN_FONT_SCALE} onClick={() => setFontScale((value) => Math.max(MIN_FONT_SCALE, Number((value - FONT_SCALE_STEP).toFixed(1))))} data-testid="button-decrease-font"><Minus size={15}/></button>
+            <span className="sb-font-scale mono" role="status" aria-live="polite" data-testid="font-size-value">{Math.round(fontScale * 100)}%</span>
+            <button type="button" className="sb-btn sb-icon-btn" aria-label="Increase site font size" title="Increase font size" disabled={fontScale >= MAX_FONT_SCALE} onClick={() => setFontScale((value) => Math.min(MAX_FONT_SCALE, Number((value + FONT_SCALE_STEP).toFixed(1))))} data-testid="button-increase-font"><Plus size={15}/></button>
+          </div>
         </div>
       </header>
       <div className="sb-sample-ribbon">
@@ -535,7 +545,7 @@ function Home() {
           strategy={strategy}
           index={index}
           count={orderedStrategies.length}
-          chart={<EquityChart strategy={strategy} light={light}/>}
+          chart={<EquityChart strategy={strategy}/>}
           onMove={(direction) => {
             const target = orderedStrategies[index + direction];
             if (target) reorderStrategy(strategy.magicNumber, target.magicNumber);
