@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { StrategyBoardTile } from '@/components/strategy-board-tile';
@@ -23,7 +23,7 @@ import {
 import {
   Activity, AlertCircle, ArrowDownRight, ArrowUpRight, BarChart3, Check,
   ChevronDown, CircleHelp, Clock3, Copy, ExternalLink,
-  Moon, Printer, RefreshCw, ShieldAlert, Sun, Trash2, TrendingUp, X,
+  Minus, Plus, RefreshCw, ShieldAlert, Trash2, TrendingUp, X,
 } from 'lucide-react';
 import {
   Route,
@@ -47,6 +47,62 @@ const INTERVALS = [
   { label: '1 hour', ms: 60 * 60 * 1000 },
   { label: '24 hours', ms: 24 * 60 * 60 * 1000 },
 ];
+const FONT_SCALE_STORAGE_KEY = 'mt5-strategy-dashboard-font-scale-v1';
+const MIN_FONT_SCALE = 0.8;
+const MAX_FONT_SCALE = 1.3;
+const FONT_SCALE_STEP = 0.1;
+type FontScaleElement = HTMLElement | SVGElement;
+type InlineFontSize = { value: string; priority: string };
+const fontBaselines = new WeakMap<FontScaleElement, number>();
+const originalInlineFontSizes = new WeakMap<FontScaleElement, InlineFontSize>();
+const scaledFontElements = new Set<FontScaleElement>();
+
+function applySiteFontScale(scale: number) {
+  for (const element of scaledFontElements) {
+    const original = originalInlineFontSizes.get(element);
+    if (original?.value) {
+      element.style.setProperty('font-size', original.value, original.priority);
+    } else {
+      element.style.removeProperty('font-size');
+    }
+  }
+  scaledFontElements.clear();
+
+  const textElements = new Set<FontScaleElement>();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const text = walker.currentNode;
+    if (!text.textContent?.trim()) continue;
+    const owner = text.parentElement;
+    if (owner instanceof HTMLElement || owner instanceof SVGElement) textElements.add(owner);
+  }
+
+  for (const element of textElements) {
+    if (!originalInlineFontSizes.has(element)) {
+      originalInlineFontSizes.set(element, {
+        value: element.style.getPropertyValue('font-size'),
+        priority: element.style.getPropertyPriority('font-size'),
+      });
+    }
+    const baseline = Number.parseFloat(getComputedStyle(element).fontSize);
+    if (!Number.isFinite(baseline)) continue;
+    fontBaselines.set(element, baseline);
+    element.style.setProperty('font-size', `${baseline * scale}px`, 'important');
+    scaledFontElements.add(element);
+  }
+}
+
+function readSavedFontScale() {
+  try {
+    const saved = Number(window.localStorage.getItem(FONT_SCALE_STORAGE_KEY));
+    return Number.isFinite(saved)
+      ? Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, saved))
+      : 1;
+  } catch {
+    return 1;
+  }
+}
+
 const money = (value: number) => new Intl.NumberFormat('en-US', {
   style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2,
 }).format(value);
@@ -108,13 +164,13 @@ function MetricTile({ label, value, detail, tone = 'neutral', icon }: {
   </div>;
 }
 
-function EquityChart({ strategy, light }: { strategy: StrategyPerformance; light: boolean }) {
+function EquityChart({ strategy }: { strategy: StrategyPerformance }) {
   const points = useMemo(() => [...strategy.equity].sort(
     (a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime(),
   ), [strategy.equity]);
   const stroke = strategy.netProfit >= 0 ? '#63d6a9' : '#f08a81';
-  const grid = light ? 'rgba(52,69,82,.13)' : 'rgba(175,192,205,.11)';
-  const ticks = light ? '#657482' : '#8897a4';
+  const grid = 'rgba(175,192,205,.11)';
+  const ticks = '#8897a4';
   const id = `fill-${strategy.magicNumber}`.replaceAll('-', 'n');
   return <div className="relative h-[228px] w-full sm:h-[260px]" role="img" aria-label={`Magic number ${strategy.magicNumber} cumulative net profit equity chart`}>
     {!points.length ? (
@@ -134,11 +190,11 @@ function EquityChart({ strategy, light }: { strategy: StrategyPerformance; light
           <ReferenceLine y={0} stroke={grid} strokeDasharray="4 4" />
           <Tooltip
             cursor={{ stroke: stroke, strokeDasharray: '3 4', strokeOpacity: .5 }}
-            contentStyle={{ background: light ? '#f7faf9' : '#151d24', border: `1px solid ${light ? '#d9e2df' : '#2b3943'}`, borderRadius: 9, color: light ? '#15212a' : '#e3e9eb', fontSize: 12 }}
+            contentStyle={{ background: '#151d24', border: '1px solid #2b3943', borderRadius: 12, color: '#e3e9eb', fontSize: 12 }}
             labelFormatter={(label) => new Date(String(label)).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
             formatter={(value, name) => [money(Number(value)), name === 'cumulativeProfit' ? 'Cumulative net profit' : 'Trade net profit']}
           />
-          <Area type="monotone" dataKey="cumulativeProfit" name="Cumulative net profit" stroke={stroke} strokeWidth={2} fill={`url(#${id})`} activeDot={{ r: 4, fill: stroke, stroke: light ? '#f7faf9' : '#151d24', strokeWidth: 2 }} isAnimationActive={false} />
+          <Area type="monotone" dataKey="cumulativeProfit" name="Cumulative net profit" stroke={stroke} strokeWidth={2} fill={`url(#${id})`} activeDot={{ r: 4, fill: stroke, stroke: '#151d24', strokeWidth: 2 }} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
     )}
@@ -146,7 +202,7 @@ function EquityChart({ strategy, light }: { strategy: StrategyPerformance; light
 }
 
 function Home() {
-  const [light, setLight] = useState(false);
+  const [fontScale, setFontScale] = useState(readSavedFontScale);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [intervalMs, setIntervalMs] = useState(INTERVALS[0].ms);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -163,6 +219,28 @@ function Home() {
   const [draggedMagicNumber, setDraggedMagicNumber] = useState<number | null>(null);
   const [dropTargetMagicNumber, setDropTargetMagicNumber] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    applySiteFontScale(fontScale);
+  }, [fontScale]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FONT_SCALE_STORAGE_KEY, String(fontScale));
+    } catch {
+      console.warn('Font size could not be saved in this browser.');
+    }
+  }, [fontScale]);
+  useEffect(() => {
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => applySiteFontScale(fontScale));
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, [fontScale]);
   const query = useGetTradesDashboard({
     query: {
       queryKey: isPreviewDemo ? ['mt5-preview-demo-dashboard'] : getGetTradesDashboardQueryKey(),
@@ -227,9 +305,9 @@ function Home() {
   const webhookUrl = `${window.location.origin}/api/trades`;
   const updatedAt = isPreviewDemo ? 'Demo data · not synced' : timestamp(query.dataUpdatedAt);
   useEffect(() => {
-    document.documentElement.classList.toggle('light', light);
-    document.documentElement.classList.toggle('dark', !light);
-  }, [light]);
+    document.documentElement.classList.remove('light');
+    document.documentElement.classList.add('dark');
+  }, []);
   useEffect(() => {
     const closeOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false);
